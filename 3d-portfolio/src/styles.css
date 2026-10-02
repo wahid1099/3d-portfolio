@@ -1,0 +1,208 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
+
+:root {
+  --bg: #04060d;
+  --bg-2: #080d1c;
+  --ink: #e6ecf8;
+  --muted: #aab4cd;
+  --faint: #96a1bd;
+  --line: rgba(130, 165, 255, 0.13);
+  --cyan: #6fdcef;
+  --blue: #4f7dff;
+  --violet: #9a7bff;
+  --threat: #ff7a59;
+  --safe: #5ff0c8;
+}
+
+/* The page scrolls the window so sticky scenes and the WebGL camera share one clock. */
+html,
+body {
+  height: auto !important;
+  background: var(--bg);
+}
+#root {
+  height: auto !important;
+  overflow: visible !important;
+}
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  color: var(--ink);
+  font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+::selection {
+  background: rgba(111, 220, 239, 0.28);
+  color: #fff;
+}
+.mono {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-feature-settings: "zero" 1;
+}
+
+/* Volumetric light layered under the canvas. */
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60vw 50vh at 72% 38%, rgba(48, 110, 255, 0.16), transparent 70%),
+    radial-gradient(50vw 60vh at 12% 90%, rgba(154, 123, 255, 0.1), transparent 70%),
+    radial-gradient(120vw 80vh at 50% -10%, rgba(111, 220, 239, 0.06), transparent 60%),
+    linear-gradient(180deg, #04060d 0%, #050918 50%, #04060d 100%);
+}
+.vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(2, 3, 8, 0.75) 100%);
+}
+
+.glass {
+  background: linear-gradient(180deg, rgba(18, 27, 54, 0.62), rgba(9, 14, 30, 0.55));
+  border: 1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 rgba(190, 220, 255, 0.07),
+    0 30px 80px -30px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+}
+.hairline {
+  border-color: var(--line);
+}
+.glow-edge {
+  position: relative;
+}
+.glow-edge::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(111, 220, 239, 0.45), transparent 35%, transparent 65%, rgba(154, 123, 255, 0.4));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.focus-ring:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* status dot */
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(95, 240, 200, 0.55); }
+  70% { box-shadow: 0 0 0 9px rgba(95, 240, 200, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(95, 240, 200, 0); }
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--safe);
+  animation: pulse-dot 2.4s infinite;
+}
+
+@keyframes cue {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(5px); opacity: 1; }
+}
+.scroll-cue { animation: cue 2.2s ease-in-out infinite; }
+
+@keyframes dash {
+  to { stroke-dashoffset: -40; }
+}
+.flow-line { stroke-dasharray: 3 7; animation: dash 1.6s linear infinite; }
+
+@keyframes drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -10px, 0); }
+}
+
+/* projected 3D labels */
+.node-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform, opacity;
+  transition: color 0.25s, border-color 0.25s, background 0.25s;
+}
+.node-label[data-state="hot"] {
+  color: #fff;
+  border-color: rgba(191, 246, 255, 0.7);
+  background: rgba(20, 60, 90, 0.7);
+  box-shadow: 0 0 24px rgba(111, 220, 239, 0.35);
+}
+.node-label[data-state="linked"] {
+  color: #d9f6ff;
+  border-color: rgba(111, 220, 239, 0.45);
+}
+.pipe-label[data-active="true"] .pipe-name { color: #fff; }
+
+.tag {
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: #b9c6e4;
+  border: 1px solid var(--line);
+  background: rgba(14, 22, 46, 0.55);
+  border-radius: 999px;
+  padding: 4px 11px;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .status-dot, .scroll-cue, .flow-line { animation: none; }
+}
+
+/* ISARA architecture: packets ride the spine; each layer lights as one passes. */
+@keyframes packet {
+  0% { top: 0%; opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.packet {
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  height: 18px;
+  margin-left: -3px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, transparent, #bff6ff);
+  box-shadow: 0 0 12px rgba(111, 220, 239, 0.9);
+  animation: packet 4.2s linear infinite;
+}
+@keyframes layer-hit {
+  0%, 100% { border-color: rgba(130, 165, 255, 0.13); box-shadow: none; }
+  4% { border-color: rgba(111, 220, 239, 0.7); box-shadow: 0 0 26px -6px rgba(111, 220, 239, 0.55); }
+  16% { border-color: rgba(130, 165, 255, 0.13); box-shadow: none; }
+}
+.arch-layer { animation: layer-hit 4.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .packet, .arch-layer { animation: none; }
+  .packet { display: none; }
+}
+
+.shell {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+@media (min-width: 640px) { .shell { padding-inline: 32px; } }
+@media (min-width: 1024px) { .shell { padding-inline: 48px; } }
+/* leave a lane for the depth gauge */
+@media (min-width: 1280px) { .shell { padding-right: 180px; } }
