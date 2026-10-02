@@ -5,6 +5,7 @@ import { measureSections } from "./lib/scroll";
 import { Nav } from "./components/ui/Nav";
 import { StoryRail } from "./components/ui/StoryRail";
 import { Hero } from "./components/sections/Hero";
+import { Workspace } from "./components/sections/Workspace";
 import { About } from "./components/sections/About";
 import { TechStack } from "./components/sections/TechStack";
 import { Experience } from "./components/sections/Experience";
@@ -64,6 +65,7 @@ export default function Portfolio() {
       <StoryRail />
       <main className="relative z-10">
         <Hero />
+        <Workspace />
         <About />
         <TechStack has3D={full3D} />
         <Experience />
