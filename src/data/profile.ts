@@ -10,6 +10,8 @@ export const profile = {
   portfolio: "https://eng-wahid-portfoliio.netlify.app/",
   leetcode: "https://leetcode.com/u/wahidahmed890/",
   leetcodeUser: "wahidahmed890",
+  resume: "/resume.pdf",
+  resumeFileName: "Md-Wahid-Resume.pdf",
 };
 
 /** The story the scroll travels through. A real sequence, so it is numbered. */

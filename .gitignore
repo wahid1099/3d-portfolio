@@ -1,3 +1,6 @@
 node_modules
 dist
 .DS_Store
+public/og-image.png
+public/apple-touch-icon.png
+public/favicon-32.png

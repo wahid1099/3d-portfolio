@@ -83,13 +83,27 @@ export function Contact() {
           </div>
 
           <Reveal delay={0.1}>
-            <a
-              href={`mailto:${profile.email}?subject=Let's%20build%20something%20secure`}
-              className="group mt-10 inline-flex h-14 items-center gap-3 rounded-full bg-[color:var(--ink)] px-8 text-[16px] font-medium text-[#060a16] transition-all hover:bg-white hover:shadow-[0_0_50px_rgba(111,220,239,0.35)]"
-            >
-              Start a Conversation
-              <span className="transition-transform group-hover:translate-x-1">→</span>
-            </a>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <a
+                href={`mailto:${profile.email}?subject=Let's%20build%20something%20secure`}
+                className="group inline-flex h-14 items-center gap-3 rounded-full bg-[color:var(--ink)] px-8 text-[16px] font-medium text-[#060a16] transition-all hover:bg-white hover:shadow-[0_0_50px_rgba(111,220,239,0.35)]"
+              >
+                Start a Conversation
+                <span className="transition-transform group-hover:translate-x-1">→</span>
+              </a>
+              <a
+                href={profile.resume}
+                download={profile.resumeFileName}
+                className="group inline-flex h-14 items-center gap-3 rounded-full border border-[color:var(--line)] bg-[rgba(10,16,34,0.5)] px-7 text-[15px] text-[color:var(--ink)] backdrop-blur-md transition-all hover:border-[rgba(154,123,255,0.5)]"
+              >
+                <svg viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 3v12" />
+                  <path d="m7 10 5 5 5-5" />
+                  <path d="M5 21h14" />
+                </svg>
+                Download Résumé
+              </a>
+            </div>
           </Reveal>
         </div>
       </div>

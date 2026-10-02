@@ -1,7 +1,8 @@
-import { eduTech, isaraLayers, repos } from "../../data/projects";
+import { eduTech, isaraLayers } from "../../data/projects";
 import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { Eyebrow, Reveal } from "../ui/Reveal";
+import { curatedRepos, useGitHubRepos, type Repo } from "../../hooks/useGitHubRepos";
 import { GitHubMark } from "./Hero";
 
 export function Projects() {
@@ -129,7 +130,7 @@ function EduSphereCard() {
             ].map(([a, b]) => (
               <div key={a} className="rounded-xl border border-[color:var(--line)] bg-[rgba(6,10,22,0.7)] px-3 py-3 text-center">
                 <p className="text-[15px]">{a}</p>
-                <p className="mono text-[12px] text-[color:var(--faint)]">{b}</p>
+                <p className="mono mt-1 text-[12px] text-[color:var(--faint)]">{b}</p>
               </div>
             ))}
           </div>
@@ -155,7 +156,83 @@ function EduSphereCard() {
   );
 }
 
+function languageLabel(lang: string | null): string {
+  if (!lang) return "Code";
+  const map: Record<string, string> = {
+    TypeScript: "TS",
+    JavaScript: "JS",
+    Python: "Py",
+    Go: "Go",
+    Rust: "Rs",
+    Java: "Jv",
+    "C++": "C++",
+    C: "C",
+    Dart: "Dart",
+    Shell: "sh",
+  };
+  return map[lang] ?? lang;
+}
+
+function LiveRepoCard({ repo, index }: { repo: Repo; index: number }) {
+  return (
+    <li>
+      <a
+        href={repo.html_url}
+        target="_blank"
+        rel="noreferrer"
+        className="group relative flex h-full flex-col rounded-2xl border border-[color:var(--line)] bg-[rgba(10,16,34,0.6)] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[rgba(111,220,239,0.4)] hover:bg-[rgba(14,24,50,0.7)]"
+      >
+        <p className="mono flex items-center justify-between text-[12px] uppercase tracking-[0.16em] text-[color:var(--faint)]">
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block size-1.5 rounded-full bg-[color:var(--safe)] shadow-[0_0_8px_rgba(95,240,200,0.7)]" />
+            Live · {languageLabel(repo.language)}
+          </span>
+          <span className="text-[color:var(--muted)] opacity-0 transition-opacity group-hover:opacity-100">↗</span>
+        </p>
+        <p className="mt-4 text-[19px] font-medium tracking-[-0.01em]">{repo.name}</p>
+        <p className="mt-2 flex-1 text-[15px] leading-[1.55] text-[color:var(--muted)]">
+          {repo.description ?? "No description provided."}
+        </p>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <p className="mono text-[13px] text-[#8fb4e8] truncate">
+            {repo.topics.length ? repo.topics.slice(0, 3).join(" · ") : languageLabel(repo.language)}
+          </p>
+          <p className="mono shrink-0 text-[12px] text-[color:var(--faint)]">
+            ★ {repo.stargazers_count}
+          </p>
+        </div>
+        <span className="mono absolute right-3 top-3 text-[10px] uppercase tracking-[0.2em] text-[color:var(--faint)] opacity-60">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      </a>
+    </li>
+  );
+}
+
+function CuratedRepoCard({ r }: { r: (typeof curatedRepos)[number] }) {
+  return (
+    <li>
+      <a
+        href={r.url}
+        target="_blank"
+        rel="noreferrer"
+        className="group flex h-full flex-col rounded-2xl border border-[color:var(--line)] bg-[rgba(10,16,34,0.6)] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[rgba(154,123,255,0.4)] hover:bg-[rgba(14,24,50,0.7)]"
+      >
+        <p className="mono flex items-center justify-between text-[12px] uppercase tracking-[0.16em] text-[color:var(--faint)]">
+          {r.kind}
+          <span className="text-[color:var(--muted)] opacity-0 transition-opacity group-hover:opacity-100">↗</span>
+        </p>
+        <p className="mt-4 text-[19px] font-medium tracking-[-0.01em]">{r.name}</p>
+        <p className="mt-2 flex-1 text-[15px] leading-[1.55] text-[color:var(--muted)]">{r.desc}</p>
+        <p className="mono mt-5 text-[13px] text-[#8fb4e8]">{r.tech.join(" · ")}</p>
+      </a>
+    </li>
+  );
+}
+
 function RepoGrid() {
+  const { repos, loading, error, source } = useGitHubRepos();
+
   return (
     <Reveal>
       <article className="rounded-[28px] border border-[color:var(--line)] bg-[rgba(6,10,22,0.45)] p-8 backdrop-blur-sm sm:p-12">
@@ -167,6 +244,20 @@ function RepoGrid() {
               Repositories & experiments
             </p>
             <h3 className="mt-4 text-[clamp(28px,3vw,40px)] font-semibold tracking-[-0.035em]">Engineering projects</h3>
+            <p className="mono mt-2 text-[12px] uppercase tracking-[0.16em] text-[color:var(--faint)]">
+              <span
+                className={`mr-2 inline-block size-1.5 rounded-full align-middle ${
+                  source === "live"
+                    ? "bg-[color:var(--safe)] shadow-[0_0_8px_rgba(95,240,200,0.7)]"
+                    : source === "cache"
+                      ? "bg-[color:var(--cyan)]"
+                      : "bg-[color:var(--threat)]"
+                }`}
+              />
+              {source === "live" && `Live · synced with GitHub`}
+              {source === "cache" && `Cached · ${error ? "GitHub unreachable" : "showing last sync"}`}
+              {source === "fallback" && `Offline · curated snapshot`}
+            </p>
           </div>
           <a
             href={profile.github}
@@ -178,26 +269,41 @@ function RepoGrid() {
             <span className="transition-transform group-hover:translate-x-1">→</span>
           </a>
         </div>
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {repos.map((r) => (
-            <li key={r.name}>
-              <a
-                href={profile.github}
-                target="_blank"
-                rel="noreferrer"
-                className="group flex h-full flex-col rounded-2xl border border-[color:var(--line)] bg-[rgba(10,16,34,0.6)] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-[rgba(111,220,239,0.4)] hover:bg-[rgba(14,24,50,0.7)]"
-              >
-                <p className="mono flex items-center justify-between text-[12px] uppercase tracking-[0.16em] text-[color:var(--faint)]">
-                  {r.kind}
-                  <span className="text-[color:var(--muted)] opacity-0 transition-opacity group-hover:opacity-100">↗</span>
-                </p>
-                <p className="mt-4 text-[19px] font-medium tracking-[-0.01em]">{r.name}</p>
-                <p className="mt-2 flex-1 text-[15px] leading-[1.55] text-[color:var(--muted)]">{r.desc}</p>
-                <p className="mono mt-5 text-[13px] text-[#8fb4e8]">{r.tech.join(" · ")}</p>
-              </a>
-            </li>
-          ))}
-        </ul>
+
+        {curatedRepos.length > 0 && (
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {curatedRepos.map((r) => (
+              <CuratedRepoCard key={r.name} r={r} />
+            ))}
+          </ul>
+        )}
+
+        <div className="mt-12">
+          <p className="mono text-[12px] uppercase tracking-[0.18em] text-[color:var(--faint)]">
+            Live repositories · api.github.com
+          </p>
+          {loading && repos.length === 0 ? (
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <li
+                  key={i}
+                  className="h-[200px] animate-pulse rounded-2xl border border-[color:var(--line)] bg-[rgba(10,16,34,0.4)]"
+                />
+              ))}
+            </ul>
+          ) : (
+            <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {repos.slice(0, 8).map((repo, i) => (
+                <LiveRepoCard key={repo.id} repo={repo} index={i} />
+              ))}
+            </ul>
+          )}
+          {error && source !== "live" && (
+            <p className="mono mt-4 text-[12px] text-[color:var(--threat)]">
+              GitHub API: {error}. Cached data shown.
+            </p>
+          )}
+        </div>
       </article>
     </Reveal>
   );

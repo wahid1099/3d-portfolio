@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#0a1226"/>
+      <stop offset="60%" stop-color="#060a16"/>
+      <stop offset="100%" stop-color="#04060d"/>
+    </radialGradient>
+    <radialGradient id="node" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#6fdcef"/>
+      <stop offset="100%" stop-color="#4f7dff"/>
+    </radialGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6fdcef"/>
+      <stop offset="100%" stop-color="#9a7bff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Subtle grid -->
+  <g stroke="rgba(111,220,239,0.05)" stroke-width="1">
+    <line x1="0" y1="100" x2="1200" y2="100"/>
+    <line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- Lattice nodes on right -->
+  <g stroke="rgba(111,220,239,0.35)" stroke-width="1.5" fill="none">
+    <line x1="900" y1="180" x2="980" y2="240"/>
+    <line x1="980" y1="240" x2="1060" y2="180"/>
+    <line x1="900" y1="180" x2="940" y2="320"/>
+    <line x1="1060" y1="180" x2="1020" y2="320"/>
+    <line x1="940" y1="320" x2="1020" y2="320"/>
+    <line x1="940" y1="320" x2="900" y2="440"/>
+    <line x1="1020" y1="320" x2="1060" y2="440"/>
+    <line x1="900" y1="440" x2="1060" y2="440"/>
+    <line x1="980" y1="240" x2="1000" y2="500"/>
+  </g>
+  <g fill="url(#node)">
+    <circle cx="900" cy="180" r="6"/>
+    <circle cx="980" cy="240" r="6"/>
+    <circle cx="1060" cy="180" r="6"/>
+    <circle cx="940" cy="320" r="6"/>
+    <circle cx="1020" cy="320" r="6"/>
+    <circle cx="900" cy="440" r="6"/>
+    <circle cx="1060" cy="440" r="6"/>
+    <circle cx="1000" cy="500" r="8"/>
+  </g>
+
+  <!-- Eyebrow -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <text x="80" y="120" fill="#6fdcef" font-size="20" letter-spacing="6">L00 · QUANTUM-SAFE PORTFOLIO</text>
+  </g>
+
+  <!-- Headline -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" fill="#ffffff" font-weight="700">
+    <text x="80" y="230" font-size="84" letter-spacing="-3">Md. Wahid</text>
+    <text x="80" y="320" font-size="48" letter-spacing="-1" fill="#b8c4dd" font-weight="500">Software Engineer · Backend · Cloud ·</text>
+    <text x="80" y="376" font-size="48" letter-spacing="-1" fill="#b8c4dd" font-weight="500">DevOps · Quantum-Safe Security</text>
+  </g>
+
+  <!-- Accent line -->
+  <line x1="80" y1="420" x2="640" y2="420" stroke="url(#accent)" stroke-width="3"/>
+
+  <!-- Tagline -->
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" fill="#8a99b8" font-size="22">
+    <text x="80" y="470">ISARA · EduSphere · ReliefLink · Quantum-safe infra</text>
+  </g>
+
+  <!-- Footer row -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#6fdcef" font-size="18" letter-spacing="2">
+    <text x="80" y="560">github.com/wahid1099</text>
+    <text x="80" y="588" fill="#8a99b8" font-size="16" letter-spacing="3">linkedin.com/in/md-wahid1</text>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#8a99b8" font-size="16" letter-spacing="3">
+    <text x="1120" y="588" text-anchor="end">wahid1099.netlify.app</text>
+  </g>
+</svg>
