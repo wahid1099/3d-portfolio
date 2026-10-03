@@ -19,7 +19,7 @@ const links = [
 ];
 
 const HELP = [
-  "Available: help · whoami · skills · ls · cat resume · cat links · clear · echo <msg> · neofetch",
+  "Available: help · whoami · skills · ls · cat resume · cat links · clear · echo <msg> · neofetch · ask <question>",
 ];
 
 export function Contact() {
@@ -33,6 +33,7 @@ export function Contact() {
   const [input, setInput] = useState("");
   const [cmdHistory, setCmdHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState<number>(-1);
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (!inView || reduce) return;
@@ -88,6 +89,14 @@ export function Contact() {
       case "neofetch":
         out.push({ k: "out", text: "OS: secure-core · Uptime: since 2003 · Shell: zsh · Editor: VS Code" });
         break;
+      case "ask":
+        if (!arg) {
+          out.push({ k: "err", text: "ask: provide a question, e.g. `ask what stack do you prefer?`" });
+        } else {
+          setPending(arg);
+          out.push({ k: "out", text: "› thinking…" });
+        }
+        break;
       case "clear":
         setHistory([]);
         setInput("");
@@ -100,6 +109,40 @@ export function Contact() {
     setHistIdx(-1);
     setInput("");
   };
+
+  // Fire /api/ask when an `ask` command is queued
+  useEffect(() => {
+    if (!pending) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/ask", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ question: pending }),
+        });
+        const data = await r.json();
+        if (cancelled) return;
+        const ans: string = data?.answer ?? "Sorry — I couldn't reach the assistant.";
+        const src = data?.source === "live" ? "" : " (cached)";
+        setHistory((h) => [
+          ...h,
+          { k: "out", text: `md.wahid: ${ans}${src}` },
+        ]);
+      } catch (e) {
+        if (cancelled) return;
+        setHistory((h) => [
+          ...h,
+          { k: "err", text: `ask: ${e instanceof Error ? e.message : "network error"}` },
+        ]);
+      } finally {
+        if (!cancelled) setPending(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pending]);
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

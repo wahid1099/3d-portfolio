@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type CaseStudy = {
   id: string;
@@ -24,17 +24,43 @@ export function CaseStudyModal({
   study: CaseStudy | null;
 }) {
   const reduce = useReducedMotion();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    previouslyFocused.current = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
+      if (e.key === "Tab" && dialogRef.current) {
+        const f = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (f.length === 0) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    // focus the first focusable element inside the dialog
+    requestAnimationFrame(() => {
+      const f = dialogRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      f?.focus();
+    });
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      previouslyFocused.current?.focus();
     };
   }, [open, onClose]);
 
@@ -45,6 +71,7 @@ export function CaseStudyModal({
           role="dialog"
           aria-modal="true"
           aria-label={`${study.title} case study`}
+          ref={dialogRef}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

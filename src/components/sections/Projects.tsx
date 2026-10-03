@@ -4,7 +4,7 @@ import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { Eyebrow, Reveal } from "../ui/Reveal";
 import { curatedRepos, useGitHubRepos, type Repo } from "../../hooks/useGitHubRepos";
-import { GitHubMark } from "./Hero";
+import { GitHubMark } from "../ui/icons";
 import { SnakeEatsRepos } from "../3d/SnakeEatsRepos";
 import { CaseStudyModal, type CaseStudy } from "../ui/CaseStudyModal";
 import { caseStudyById } from "../../data/caseStudies";
