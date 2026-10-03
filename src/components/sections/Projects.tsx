@@ -1,9 +1,11 @@
+import { useMemo } from "react";
 import { eduTech, isaraLayers } from "../../data/projects";
 import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { Eyebrow, Reveal } from "../ui/Reveal";
 import { curatedRepos, useGitHubRepos, type Repo } from "../../hooks/useGitHubRepos";
 import { GitHubMark } from "./Hero";
+import { SnakeEatsRepos } from "../3d/SnakeEatsRepos";
 
 export function Projects() {
   const ref = useSection("projects");
@@ -232,6 +234,11 @@ function CuratedRepoCard({ r }: { r: (typeof curatedRepos)[number] }) {
 
 function RepoGrid() {
   const { repos, loading, error, source } = useGitHubRepos();
+  // Pad the list so the snake grid always has at least 16 cells (2 rows).
+  const snakeRepos = useMemo(
+    () => (repos.length === 0 ? Array.from({ length: 16 }, (_, i) => placeholderRepo(i)) : repos),
+    [repos],
+  );
 
   return (
     <Reveal>
@@ -278,6 +285,30 @@ function RepoGrid() {
           </ul>
         )}
 
+        {/* Snake arcade — eats live GitHub repos */}
+        <div className="mt-12">
+          <p className="mono text-[12px] uppercase tracking-[0.18em] text-[color:var(--faint)]">
+            Arcade · snack the repos
+          </p>
+          <div className="mt-3 h-[380px]">
+            <SnakeEatsRepos repos={snakeRepos.slice(0, 16)} />
+          </div>
+          <p className="mono mt-3 text-[12px] uppercase tracking-[0.16em] text-[color:var(--faint)]">
+            <span
+              className={`mr-2 inline-block size-1.5 rounded-full align-middle ${
+                source === "live"
+                  ? "bg-[color:var(--safe)] shadow-[0_0_8px_rgba(95,240,200,0.7)]"
+                  : source === "cache"
+                    ? "bg-[color:var(--cyan)]"
+                    : "bg-[color:var(--threat)]"
+              }`}
+            />
+            {source === "live" && `Live · ${repos.length} repos feeding the snake`}
+            {source === "cache" && `Cached · ${error ? "GitHub unreachable" : "last sync"}`}
+            {source === "fallback" && `Offline · placeholder grid`}
+          </p>
+        </div>
+
         <div className="mt-12">
           <p className="mono text-[12px] uppercase tracking-[0.18em] text-[color:var(--faint)]">
             Live repositories · api.github.com
@@ -307,4 +338,20 @@ function RepoGrid() {
       </article>
     </Reveal>
   );
+}
+
+function placeholderRepo(i: number): Repo {
+  return {
+    id: -(1000 + i),
+    name: `repo-${i + 1}`,
+    html_url: "https://github.com/wahid1099",
+    description: "Loading…",
+    language: null,
+    stargazers_count: 0,
+    forks_count: 0,
+    topics: [],
+    updated_at: "",
+    fork: false,
+    archived: false,
+  };
 }
