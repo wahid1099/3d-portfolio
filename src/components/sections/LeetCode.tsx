@@ -18,6 +18,7 @@ export function LeetCode() {
   const medium = stats?.mediumSolved ?? 0;
   const hard = stats?.hardSolved ?? 0;
   const ranking = stats?.ranking ?? 0;
+  const contestRating = stats?.contestRating ?? 0;
   const days = stats?.streakDays ?? FALLBACK_DAYS;
 
   // Approx active-day count for the visual grid (300 grid cells, animated).
@@ -95,11 +96,12 @@ export function LeetCode() {
         {/* Difficulty breakdown + ranking — only meaningful when live data is present */}
         {stats && (easy > 0 || medium > 0 || hard > 0) && (
           <Reveal delay={0.1}>
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-6">
               <DifficultyCell label="Easy" solved={easy} total={stats.totalSolved} tint="rgba(95,240,200,1)" />
               <DifficultyCell label="Medium" solved={medium} total={stats.totalSolved} tint="rgba(111,220,239,1)" />
               <DifficultyCell label="Hard" solved={hard} total={stats.totalSolved} tint="rgba(154,123,255,1)" />
               <DifficultyCell label="Total" solved={stats.totalSolved} total={stats.totalSolved} tint="rgba(255,255,255,1)" />
+              <ContestCell rating={contestRating} />
               <RankingCell ranking={ranking} />
             </div>
           </Reveal>
@@ -150,6 +152,26 @@ function RankingCell({ ranking }: { ranking: number }) {
       <p className="mono text-[11px] uppercase tracking-[0.16em] text-[color:var(--faint)]">Global rank</p>
       <p className="mt-1 text-[22px] font-semibold leading-none text-[color:var(--cyan)]">
         #{ranking.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+function ContestCell({ rating }: { rating: number }) {
+  if (!rating) {
+    return (
+      <div className="rounded-xl border border-[color:var(--line)] bg-[rgba(6,10,22,0.5)] px-4 py-3 backdrop-blur-sm">
+        <p className="mono text-[11px] uppercase tracking-[0.16em] text-[color:var(--faint)]">Contest</p>
+        <p className="mt-1 text-[14px] text-[color:var(--muted)]">no rating</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-[color:var(--line)] bg-[rgba(6,10,22,0.5)] px-4 py-3 backdrop-blur-sm">
+      <p className="mono text-[11px] uppercase tracking-[0.16em] text-[color:var(--faint)]">Contest</p>
+      <p className="mt-1 flex items-baseline">
+        <span className="text-[22px] font-semibold leading-none text-[color:var(--cyan)]">{rating}</span>
+        <span className="mono ml-1 text-[12px] text-[color:var(--faint)]">/ 3000</span>
       </p>
     </div>
   );

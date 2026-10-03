@@ -136,10 +136,10 @@ function Laptop() {
 /* ------------------------------------------------------------------ avatar head */
 
 function AvatarHead() {
-  // Photo portrait mounted on a circular plane inside a rotating lattice sphere.
-  // Three rings of cyan/violet nodes orbit behind it — ties the photo into the
-  // QuantumCore aesthetic without obscuring the face.
-  const groupRef = useRef<THREE.Group>(null);
+  // Photo portrait mounted on a circular plane front-and-center. Behind it a
+  // rotating lattice sphere of cyan/violet nodes orbits — ties the photo into
+  // the QuantumCore aesthetic without ever obscuring the face.
+  const orbitRef = useRef<THREE.Group>(null);
   const photo = useTexture("/avatar.jpg");
   const headNodes = useMemo(() => {
     const pts: THREE.Vector3[] = [];
@@ -155,43 +155,62 @@ function AvatarHead() {
   }, []);
 
   useFrame((s, dt) => {
-    if (!groupRef.current) return;
-    groupRef.current.rotation.y += dt * 0.18;
+    if (!orbitRef.current) return;
+    orbitRef.current.rotation.y += dt * 0.18;
   });
 
   return (
-    <group ref={groupRef} position={[-1.0, 0.05, 0.4]}>
-      {/* dark sphere halo */}
-      <mesh>
-        <icosahedronGeometry args={[0.62, 2]} />
-        <meshStandardMaterial color="#0b1530" roughness={0.4} metalness={0.7} emissive="#0a2240" emissiveIntensity={0.3} transparent opacity={0.55} />
-      </mesh>
-      {/* lattice nodes */}
-      {headNodes.map((p, i) => (
-        <mesh key={i} position={[p.x * 0.68, p.y * 0.68, p.z * 0.68]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshBasicMaterial color={i % 7 === 0 ? "#9a7bff" : "#6fdcef"} />
-        </mesh>
-      ))}
-      {/* glowing ring */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.62, 0.66, 64]} />
-        <meshBasicMaterial color="#6fdcef" transparent opacity={0.45} side={THREE.DoubleSide} />
-      </mesh>
-      {/* photo portrait (front-facing, slightly offset so it reads through the lattice) */}
-      <mesh position={[0, 0, 0.05]}>
-        <circleGeometry args={[0.55, 64]} />
-        <meshBasicMaterial map={photo} transparent toneMapped={false} />
-      </mesh>
-      {/* photo border */}
-      <mesh position={[0, 0, 0.04]}>
-        <ringGeometry args={[0.55, 0.58, 64]} />
-        <meshBasicMaterial color="#04060d" side={THREE.DoubleSide} />
-      </mesh>
-      {/* shoulders silhouette */}
+    <group position={[-1.0, 0.05, 0.4]}>
+      {/* shoulders silhouette (static, behind everything) */}
       <mesh position={[0, -0.95, -0.15]}>
         <coneGeometry args={[1.1, 1.7, 16, 1, true]} />
         <meshStandardMaterial color="#0f1a36" roughness={0.7} metalness={0.3} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* orbiting lattice — rotates independently, sits BEHIND the photo (z < 0) */}
+      <group ref={orbitRef} position={[0, 0, -0.05]}>
+        {/* dark sphere halo (transparent so photo stays visible) */}
+        <mesh>
+          <icosahedronGeometry args={[0.62, 2]} />
+          <meshStandardMaterial
+            color="#0b1530"
+            roughness={0.4}
+            metalness={0.7}
+            emissive="#0a2240"
+            emissiveIntensity={0.3}
+            transparent
+            opacity={0.35}
+            depthWrite={false}
+          />
+        </mesh>
+        {/* lattice nodes */}
+        {headNodes.map((p, i) => (
+          <mesh key={i} position={[p.x * 0.68, p.y * 0.68, p.z * 0.68]}>
+            <sphereGeometry args={[0.022, 8, 8]} />
+            <meshBasicMaterial color={i % 7 === 0 ? "#9a7bff" : "#6fdcef"} />
+          </mesh>
+        ))}
+        {/* glowing equatorial ring */}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.62, 0.66, 64]} />
+          <meshBasicMaterial color="#6fdcef" transparent opacity={0.45} side={THREE.DoubleSide} depthWrite={false} />
+        </mesh>
+      </group>
+
+      {/* photo portrait — static, always faces camera, sits IN FRONT of lattice */}
+      <mesh position={[0, 0, 0.0]} renderOrder={10}>
+        <circleGeometry args={[0.55, 64]} />
+        <meshBasicMaterial map={photo} toneMapped={false} depthWrite={false} />
+      </mesh>
+      {/* photo dark ring (frame) */}
+      <mesh position={[0, 0, 0.005]} renderOrder={11}>
+        <ringGeometry args={[0.55, 0.585, 64]} />
+        <meshBasicMaterial color="#04060d" side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+      {/* photo outer cyan ring (glow) */}
+      <mesh position={[0, 0, 0.006]} renderOrder={12}>
+        <ringGeometry args={[0.585, 0.61, 64]} />
+        <meshBasicMaterial color="#6fdcef" transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
     </group>
   );
