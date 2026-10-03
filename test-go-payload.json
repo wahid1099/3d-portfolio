@@ -1,0 +1,1 @@
+{"code":"package main\nfmt.Println(\"hello from go\")"}

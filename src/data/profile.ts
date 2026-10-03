@@ -10,7 +10,7 @@ export const profile = {
   portfolio: "https://eng-wahid-portfoliio.netlify.app/",
   leetcode: "https://leetcode.com/u/wahidahmed890/",
   leetcodeUser: "wahidahmed890",
-  resume: "/resume.pdf",
+  resume: "https://drive.google.com/file/d/1ARVe8QWQkd9elngtTioIg4svz11aStC1/view?usp=sharing",
   resumeFileName: "Md-Wahid-Resume.pdf",
 };
 

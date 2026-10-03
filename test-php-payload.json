@@ -1,0 +1,1 @@
+{"code":"$users = ['Wahid', 'Tasnim', 'Sadia'];\nforeach ($users as $u) {\n  echo \"Hello $u!\\n\";\n}"}
