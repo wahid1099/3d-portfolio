@@ -2,6 +2,7 @@ import { profile } from "../../data/profile";
 
 const links = [
   { href: "#workspace", label: "Workspace" },
+  { href: "#backend", label: "Backend" },
   { href: "#stack", label: "Stack" },
   { href: "#projects", label: "Work" },
   { href: "#devops", label: "Infra" },

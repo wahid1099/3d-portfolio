@@ -7,6 +7,7 @@ import { StoryRail } from "./components/ui/StoryRail";
 import { Hero } from "./components/sections/Hero";
 import { Workspace } from "./components/sections/Workspace";
 import { About } from "./components/sections/About";
+import { Backend } from "./components/sections/Backend";
 import { TechStack } from "./components/sections/TechStack";
 import { Experience } from "./components/sections/Experience";
 import { Projects } from "./components/sections/Projects";
@@ -67,6 +68,7 @@ export default function Portfolio() {
         <Hero />
         <Workspace />
         <About />
+        <Backend />
         <TechStack has3D={full3D} />
         <Experience />
         <Projects />
