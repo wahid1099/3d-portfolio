@@ -3,7 +3,11 @@ import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { SplitHeadline } from "../ui/Reveal";
 import { useMagnetic } from "../../hooks/magnetic";
-import avatarUrl from "/my-pic.png?url";
+
+// Public-folder assets: served at <baseUrl>/<filename>. import.meta.env.BASE_URL
+// is "/" in dev and the configured base in production, which makes this work
+// whether the site is hosted at root or under a subpath.
+const avatarUrl = `${import.meta.env.BASE_URL}my-pic.png`.replace(/\/+/g, "/");
 
 export function Hero() {
   const ref = useSection("hero");
