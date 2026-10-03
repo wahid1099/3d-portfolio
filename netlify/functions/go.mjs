@@ -202,9 +202,16 @@ function runGo(src, env) {
     // blank line or close brace
     if (src[i] === "}") return false;
     // package / import (skip line)
-    if (src.startsWith("package ", i)) { while (i < src.length && src[i] !== "\n") i++; return true; }
+    if (src.startsWith("package ", i)) {
+      // skip until end of line OR semicolon
+      while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+      if (src[i] === ";") i++;
+      return true;
+    }
     if (src.startsWith("import ", i)) {
-      while (i < src.length && src[i] !== "\n") i++;
+      // skip until end of line OR semicolon
+      while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+      if (src[i] === ";") i++;
       return true;
     }
     // for
@@ -338,3 +345,4 @@ export default async (request) => {
   const lines = runGo(code, input);
   return json({ ok: true, output: lines.join("\n"), go_version: GO_VERSION });
 };
+// 2026-10-03T12:03:51.7317878+06:00
