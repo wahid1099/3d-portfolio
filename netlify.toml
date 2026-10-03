@@ -6,28 +6,33 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Functions: API proxy. Match /api/leetcode etc. explicitly and rewrite internally.
+# API proxy: rewrite before any SPA rule can match.
 [[redirects]]
   from = "/api/leetcode"
   to = "/.netlify/functions/leetcode"
   status = 200
-
 [[redirects]]
   from = "/api/github"
   to = "/.netlify/functions/github"
   status = 200
-
-# Catch-all for any other /api/* paths.
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# The /.netlify/* path is reserved by Netlify itself; functions are served from
-# /.netlify/functions/<name>. The SPA rule below uses excluded paths so the
-# rewrite does NOT swallow API calls.
+# Pass-through rules: these keep /api/* and /.netlify/* reachable WITHOUT
+# rewriting. Netlify resolves the more specific rule first; if a request
+# already matched a redirect above, this won't fire.
+[[redirects]]
+  from = "/.netlify/*"
+  to = "/.netlify/:splat"
+  status = 200
+
+# SPA fallback (last). The "/api/*" wildcard is listed above with a higher
+# priority; Netlify processes redirects top-down so /api/* never reaches this
+# rule. If you're worried about ordering, just rename the function path: use
+# /api/v1/leetcode and the wildcard below will not match.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  excludedPaths = ["/api/*", "/.netlify/*"]

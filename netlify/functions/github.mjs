@@ -1,17 +1,19 @@
 // netlify/functions/github.mjs
-// Proxies GitHub REST API for wahid1099's public repos. Server-side fetch avoids
-// any client CORS/rate-limit issues. Caches 30 minutes in-memory.
+// Netlify v2 function. Proxies GitHub REST API for wahid1099's public repos.
+// Server-side fetch avoids CORS, gets a 30-min cache, no token exposure.
 
-const USER = "wahidah1099";
+const USER = "wahid1099";
 const ENDPOINT = `https://api.github.com/users/${USER}/repos?per_page=100&sort=updated`;
 
 let cache = { ts: 0, data: null };
-const TTL = 1000 * 60 * 30; // 30 minutes
+const TTL = 1000 * 60 * 30;
 
 export default async () => {
   const now = Date.now();
   if (cache.data && now - cache.ts < TTL) {
-    return json(cache.data, "cache");
+    return Response.json(cache.data, {
+      headers: { "x-data-source": "cache", "cache-control": "public, max-age=1800" },
+    });
   }
 
   try {
@@ -39,21 +41,13 @@ export default async () => {
         archived: x.archived,
       }));
     cache = { ts: now, data: filtered };
-    return json(filtered, "live");
+    return Response.json(filtered, {
+      headers: { "x-data-source": "live", "cache-control": "public, max-age=1800" },
+    });
   } catch (err) {
-    return json({ error: String(err), source: "snapshot" }, "snapshot", 502);
+    return Response.json(
+      { error: String(err), source: "snapshot" },
+      { status: 502, headers: { "x-data-source": "snapshot" } },
+    );
   }
 };
-
-function json(body, kind, status = 200) {
-  return {
-    statusCode: status,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "public, max-age=1800",
-      "x-data-source": kind,
-      "access-control-allow-origin": "*",
-    },
-    body: JSON.stringify(body),
-  };
-}

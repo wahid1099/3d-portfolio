@@ -1,7 +1,7 @@
 // netlify/functions/leetcode.mjs
-// Proxies the user-facing LeetCode stats API. Caches in-memory for 5 minutes
-// (Netlify Functions stay warm) and exposes CORS for the deployed site.
-// On upstream failure we serve a hand-curated snapshot so the site is never empty.
+// Netlify v2 (Edge/Response) function. Proxies the user-facing LeetCode stats
+// API. Caches in-memory for 5 minutes (function instance stays warm).
+// On upstream failure serves a hand-curated snapshot.
 
 const UPSTREAM = "https://alfa-leetcode-api.onrender.com";
 const USER = "wahidahmed890";
@@ -9,10 +9,8 @@ const SOLVED = `${UPSTREAM}/${USER}/solved`;
 const CONTEST = `${UPSTREAM}/${USER}/contest`;
 
 let cache = { ts: 0, data: null };
-const TTL = 1000 * 60 * 5; // 5 minutes
+const TTL = 1000 * 60 * 5;
 
-// Hand-curated snapshot from a fresh fetch (Sept 2026).
-// Keeps the page from going blank if Render is fully down.
 const FALLBACK = {
   totalSolved: 1200,
   easySolved: 387,
@@ -44,7 +42,9 @@ async function fetchJson(url, timeoutMs = 4000) {
 export default async () => {
   const now = Date.now();
   if (cache.data && now - cache.ts < TTL) {
-    return json(cache.data, "cache");
+    return Response.json(cache.data, {
+      headers: { "x-data-source": "cache", "cache-control": "public, max-age=300" },
+    });
   }
 
   try {
@@ -71,21 +71,13 @@ export default async () => {
     };
 
     cache = { ts: now, data };
-    return json(data, "live");
+    return Response.json(data, {
+      headers: { "x-data-source": "live", "cache-control": "public, max-age=300" },
+    });
   } catch (err) {
-    return json({ ...FALLBACK, source: "snapshot", error: String(err) }, "snapshot");
+    return Response.json({ ...FALLBACK, error: String(err) }, {
+      status: 200,
+      headers: { "x-data-source": "snapshot", "cache-control": "public, max-age=60" },
+    });
   }
 };
-
-function json(body, kind) {
-  return {
-    statusCode: 200,
-    headers: {
-      "content-type": "application/json",
-      "cache-control": "public, max-age=300",
-      "x-data-source": kind,
-      "access-control-allow-origin": "*",
-    },
-    body: JSON.stringify(body),
-  };
-}

@@ -76,7 +76,7 @@ $accent.Dispose()
 # Footer
 $g.DrawString('github.com/wahid1099', $monoFont, $cyanBrush, 80, 540)
 $g.DrawString('linkedin.com/in/md-wahid1', $monoFont, $ghostBrush, 80, 568)
-$g.DrawString('wahid1099.netlify.app', $monoFont, $ghostBrush, ($W - 80), 568, (New-Object System.Drawing.StringFormat))
+$g.DrawString('brilliant-vacherin-479187.netlify.app', $monoFont, $ghostBrush, ($W - 80), 568, (New-Object System.Drawing.StringFormat))
 
 $outDir = Split-Path $out
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Force -Path $outDir | Out-Null }
