@@ -6,33 +6,29 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# API proxy: rewrite before any SPA rule can match.
+# Functions: API proxy. force=true ensures these always trigger.
 [[redirects]]
   from = "/api/leetcode"
   to = "/.netlify/functions/leetcode"
   status = 200
+  force = true
+
 [[redirects]]
   from = "/api/github"
   to = "/.netlify/functions/github"
   status = 200
+  force = true
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
+  force = true
 
-# Pass-through rules: these keep /api/* and /.netlify/* reachable WITHOUT
-# rewriting. Netlify resolves the more specific rule first; if a request
-# already matched a redirect above, this won't fire.
-[[redirects]]
-  from = "/.netlify/*"
-  to = "/.netlify/:splat"
-  status = 200
-
-# SPA fallback (last). The "/api/*" wildcard is listed above with a higher
-# priority; Netlify processes redirects top-down so /api/* never reaches this
-# rule. If you're worried about ordering, just rename the function path: use
-# /api/v1/leetcode and the wildcard below will not match.
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# No SPA fallback: Vite outputs index.html at / and we have no client-side
+# routing (every nav is a section anchor #foo). Without the wildcard rewrite,
+# /api/* routes only hit the function rules above, never get rewritten to
+# index.html.
+#
+# If you ever add client-side routing, re-add a [[redirects]] rule that
+# excludes /api/* and /.netlify/* explicitly.
