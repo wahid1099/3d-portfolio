@@ -31,10 +31,13 @@ export const sectionLayer: Record<string, number> = {
   stack: 2,
   experience: 3,
   projects: 3,
+  contributions: 3,
   devops: 4,
   security: 5,
   philosophy: 6,
   leetcode: 6,
+  now: 6,
+  testimonials: 6,
   contact: 6,
 };
 

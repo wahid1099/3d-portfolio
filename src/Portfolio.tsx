@@ -4,6 +4,9 @@ import { useDeviceTier, useReducedMotionPref } from "./hooks/useDeviceTier";
 import { measureSections } from "./lib/scroll";
 import { Nav } from "./components/ui/Nav";
 import { StoryRail } from "./components/ui/StoryRail";
+import { AudioOrb } from "./components/ui/AudioOrb";
+import { useKonami } from "./components/ui/Konami";
+import { SecretRoom } from "./components/ui/SecretRoom";
 import { Hero } from "./components/sections/Hero";
 import { Workspace } from "./components/sections/Workspace";
 import { About } from "./components/sections/About";
@@ -16,6 +19,10 @@ import { Security } from "./components/sections/Security";
 import { Philosophy } from "./components/sections/Philosophy";
 import { LeetCode } from "./components/sections/LeetCode";
 import { Contact, Footer } from "./components/sections/Contact";
+import { Now } from "./components/sections/Now";
+import { Testimonials } from "./components/sections/Testimonials";
+import { Contributions } from "./components/sections/Contributions";
+import { Cursor } from "./components/ui/Cursor";
 
 // The 3D scene is code-split so text paints first.
 const Scene = lazy(() => import("./components/3d/Scene"));
@@ -76,11 +83,22 @@ export default function Portfolio() {
         <Security />
         <Philosophy />
         <LeetCode />
+        <Contributions />
+        <Now />
+        <Testimonials />
         <Contact />
       </main>
       <div className="relative z-10">
         <Footer />
       </div>
+      <AudioOrb />
+      <SecretRoomGate />
+      <Cursor />
     </>
   );
+}
+
+function SecretRoomGate() {
+  const { open, setOpen } = useKonami();
+  return <SecretRoom open={open} onClose={() => setOpen(false)} />;
 }

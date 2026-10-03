@@ -4,10 +4,12 @@ import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { Eyebrow, Reveal, SplitHeadline } from "../ui/Reveal";
 
-const script = [
-  { kind: "cmd", text: "./open-channel --to md.wahid" },
-  { kind: "out", text: "negotiating key exchange … ML-KEM-768 ✓" },
-  { kind: "out", text: "channel established · quantum-safe" },
+type TermLine = { k: "cmd" | "out" | "err" | "html"; text: string; href?: string };
+
+const intro: TermLine[] = [
+  { k: "cmd", text: "./open-channel --to md.wahid" },
+  { k: "out", text: "negotiating key exchange … ML-KEM-768 ✓" },
+  { k: "out", text: "channel established · quantum-safe" },
 ];
 
 const links = [
@@ -16,12 +18,21 @@ const links = [
   { k: "email", label: profile.email, href: `mailto:${profile.email}` },
 ];
 
+const HELP = [
+  "Available: help · whoami · skills · ls · cat resume · cat links · clear · echo <msg> · neofetch",
+];
+
 export function Contact() {
   const ref = useSection("contact");
   const term = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const inView = useInView(term, { once: true, margin: "-15% 0px" });
   const reduce = useReducedMotion();
-  const [shown, setShown] = useState(reduce ? script.length + links.length : 0);
+  const [history, setHistory] = useState<TermLine[]>(intro);
+  const [shown, setShown] = useState(reduce ? intro.length + links.length : 0);
+  const [input, setInput] = useState("");
+  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
+  const [histIdx, setHistIdx] = useState<number>(-1);
 
   useEffect(() => {
     if (!inView || reduce) return;
@@ -29,10 +40,90 @@ export function Contact() {
     const id = window.setInterval(() => {
       n++;
       setShown(n);
-      if (n >= script.length + links.length) window.clearInterval(id);
+      if (n >= intro.length + links.length) window.clearInterval(id);
     }, 380);
     return () => window.clearInterval(id);
   }, [inView, reduce]);
+
+  // After intro finishes, populate history once.
+  useEffect(() => {
+    if (shown >= intro.length + links.length && history.length === intro.length) {
+      const linkLines: TermLine[] = links.map((l) => ({ k: "html", text: `${l.k}  ${l.label}`, href: l.href }));
+      setHistory([...intro, ...linkLines]);
+    }
+  }, [shown, history.length]);
+
+  const run = (raw: string) => {
+    const line = raw.trim();
+    if (!line) return;
+    const newHist = [...history, { k: "cmd" as const, text: line }];
+    const [cmd, ...args] = line.split(/\s+/);
+    const arg = args.join(" ");
+    const out: TermLine[] = [];
+    switch (cmd) {
+      case "help":
+        out.push(...HELP.map((t) => ({ k: "out" as const, text: t })));
+        break;
+      case "whoami":
+        out.push({ k: "out", text: "md.wahid — backend & cloud engineer, building quantum-safe systems." });
+        break;
+      case "skills":
+        out.push({ k: "out", text: "Node.js · TypeScript · PostgreSQL · AWS · Docker · K8s · Post-Quantum Crypto" });
+        break;
+      case "ls":
+        out.push({ k: "out", text: "resume.pdf  github/  linkedin/  email  projects/" });
+        break;
+      case "cat":
+        if (arg === "resume") {
+          out.push({ k: "html", text: "↗ Opening résumé …", href: profile.resume });
+        } else if (arg === "links") {
+          links.forEach((l) => out.push({ k: "html", text: `${l.k}  ${l.label}`, href: l.href }));
+        } else {
+          out.push({ k: "err", text: `cat: ${arg || "(no file)"}: No such file or directory` });
+        }
+        break;
+      case "echo":
+        out.push({ k: "out", text: arg });
+        break;
+      case "neofetch":
+        out.push({ k: "out", text: "OS: secure-core · Uptime: since 2003 · Shell: zsh · Editor: VS Code" });
+        break;
+      case "clear":
+        setHistory([]);
+        setInput("");
+        return;
+      default:
+        out.push({ k: "err", text: `zsh: command not found: ${cmd}` });
+    }
+    setHistory([...newHist, ...out]);
+    setCmdHistory((c) => [...c, line]);
+    setHistIdx(-1);
+    setInput("");
+  };
+
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      run(input);
+      requestAnimationFrame(() => term.current?.scrollTo({ top: term.current.scrollHeight, behavior: "smooth" }));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (cmdHistory.length === 0) return;
+      const idx = histIdx < 0 ? cmdHistory.length - 1 : Math.max(0, histIdx - 1);
+      setHistIdx(idx);
+      setInput(cmdHistory[idx]);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (histIdx < 0) return;
+      const next = histIdx + 1;
+      if (next >= cmdHistory.length) {
+        setHistIdx(-1);
+        setInput("");
+      } else {
+        setHistIdx(next);
+        setInput(cmdHistory[next]);
+      }
+    }
+  };
 
   return (
     <section id="contact" ref={ref} className="relative flex min-h-[100vh] items-center py-32">
@@ -47,38 +138,42 @@ export function Contact() {
             className="mt-5 text-[clamp(40px,5.6vw,84px)] font-semibold leading-[0.98] tracking-[-0.045em]"
           />
 
-          <div ref={term} className="glass glow-edge mono mt-12 overflow-hidden rounded-2xl text-[14px] sm:text-[15px]">
+          <div
+            ref={term}
+            onClick={() => inputRef.current?.focus()}
+            className="glass glow-edge mono mt-12 cursor-text overflow-hidden rounded-2xl text-[14px] sm:text-[15px]"
+          >
             <div className="flex items-center gap-2 border-b border-[color:var(--line)] px-4 py-3">
               <span className="size-2.5 rounded-full bg-[#2a3556]" />
               <span className="size-2.5 rounded-full bg-[#2a3556]" />
               <span className="size-2.5 rounded-full bg-[#2a3556]" />
               <span className="ml-3 text-[13px] text-[color:var(--faint)]">wahid@secure-core: ~</span>
             </div>
-            <div className="flex min-h-[260px] flex-col gap-2 p-5 sm:p-6">
-              {script.slice(0, shown).map((l, i) => (
-                <p key={i} className={l.kind === "cmd" ? "text-[color:var(--ink)]" : "text-[color:var(--muted)]"}>
-                  {l.kind === "cmd" ? <span className="text-[color:var(--cyan)]">$ </span> : <span className="text-[color:var(--faint)]">› </span>}
-                  {l.text}
-                </p>
+            <div className="flex min-h-[260px] flex-col gap-1 p-5 sm:p-6">
+              {history.slice(0, Math.max(shown - intro.length, 0) + intro.length).map((l, i) => (
+                <Line key={i} l={l} shown={i < shown} />
               ))}
-              <ul className="mt-2 flex flex-col gap-2">
-                {links.slice(0, Math.max(0, shown - script.length)).map((l) => (
-                  <li key={l.k}>
-                    <a
-                      href={l.href}
-                      target={l.k === "email" ? undefined : "_blank"}
-                      rel="noreferrer"
-                      className="group flex items-baseline gap-3 break-all"
-                    >
-                      <span className="w-[86px] shrink-0 text-[color:var(--faint)]">{l.k}</span>
-                      <span className="text-[color:var(--ink)] underline decoration-[rgba(111,220,239,0.3)] underline-offset-4 transition-colors group-hover:text-[color:var(--cyan)] group-hover:decoration-[color:var(--cyan)]">
-                        {l.label}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              {shown < script.length + links.length && <span className="inline-block h-[1.1em] w-2 animate-pulse bg-[color:var(--cyan)]" />}
+              {shown >= intro.length + links.length && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    run(input);
+                  }}
+                  className="mt-1 flex items-center gap-2"
+                >
+                  <span className="text-[color:var(--cyan)]">$</span>
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={onKey}
+                    placeholder='try "help", "cat resume", "whoami"'
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    className="w-full bg-transparent text-[color:var(--ink)] outline-none placeholder:text-[color:var(--faint)]"
+                  />
+                </form>
+              )}
             </div>
           </div>
 
@@ -108,6 +203,34 @@ export function Contact() {
         </div>
       </div>
     </section>
+  );
+}
+
+function Line({ l, shown }: { l: TermLine; shown: boolean }) {
+  if (!shown) return null;
+  if (l.k === "html") {
+    return (
+      <p>
+        {l.href ? (
+          <a
+            href={l.href}
+            target={l.href.startsWith("mailto:") ? undefined : "_blank"}
+            rel="noreferrer"
+            className="text-[color:var(--cyan)] underline decoration-[rgba(111,220,239,0.3)] underline-offset-4 hover:decoration-[color:var(--cyan)]"
+          >
+            ↗ {l.text}
+          </a>
+        ) : (
+          <span dangerouslySetInnerHTML={{ __html: l.text }} />
+        )}
+      </p>
+    );
+  }
+  return (
+    <p className={l.k === "cmd" ? "text-[color:var(--ink)]" : l.k === "err" ? "text-[color:var(--threat)]" : "text-[color:var(--muted)]"}>
+      {l.k === "cmd" ? <span className="text-[color:var(--cyan)]">$ </span> : <span className="text-[color:var(--faint)]">› </span>}
+      {l.text}
+    </p>
   );
 }
 

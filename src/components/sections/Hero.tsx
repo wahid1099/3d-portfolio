@@ -2,10 +2,15 @@ import { motion, useReducedMotion } from "framer-motion";
 import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
 import { SplitHeadline } from "../ui/Reveal";
+import { useMagnetic } from "../../hooks/magnetic";
+import avatarUrl from "/my-pic.png?url";
 
 export function Hero() {
   const ref = useSection("hero");
   const reduce = useReducedMotion();
+  const exploreRef = useMagnetic<HTMLAnchorElement>(0.3, 110);
+  const githubRef = useMagnetic<HTMLAnchorElement>(0.25, 100);
+  const resumeRef = useMagnetic<HTMLAnchorElement>(0.25, 100);
   const fade = (d: number) => ({
     initial: reduce ? false : { opacity: 0, y: 14 },
     animate: { opacity: 1, y: 0 },
@@ -13,6 +18,8 @@ export function Hero() {
   });
   return (
     <section id="hero" ref={ref} className="relative flex min-h-[100svh] items-end pb-28 pt-28 md:items-center md:pb-0">
+      {/* Holographic portrait — pure CSS parallax, sits behind the headline */}
+      <HoloPortrait />
       <div className="shell">
         <div className="max-w-[760px]">
           <motion.div
@@ -40,25 +47,29 @@ export function Hero() {
           </motion.p>
           <motion.div {...fade(0.9)} className="mt-10 flex flex-wrap items-center gap-3">
             <a
+              ref={exploreRef}
               href="#projects"
-              className="group inline-flex h-12 items-center gap-2 rounded-full bg-[color:var(--ink)] px-6 text-[15px] font-medium text-[#060a16] transition-all hover:bg-white hover:shadow-[0_0_40px_rgba(111,220,239,0.35)]"
+              className="group inline-flex h-12 items-center gap-2 rounded-full bg-[color:var(--ink)] px-6 text-[15px] font-medium text-[#060a16] transition-transform duration-200 will-change-transform hover:bg-white hover:shadow-[0_0_40px_rgba(111,220,239,0.35)]"
             >
               Explore My Work
               <span className="transition-transform group-hover:translate-x-0.5">→</span>
             </a>
             <a
+              ref={githubRef}
               href={profile.github}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-[color:var(--line)] bg-[rgba(10,16,34,0.5)] px-6 text-[15px] text-[color:var(--ink)] backdrop-blur-md transition-colors hover:border-[rgba(111,220,239,0.45)]"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-[color:var(--line)] bg-[rgba(10,16,34,0.5)] px-6 text-[15px] text-[color:var(--ink)] backdrop-blur-md transition-[transform,border-color] duration-200 will-change-transform hover:border-[rgba(111,220,239,0.45)]"
             >
               <GitHubMark />
               View GitHub
             </a>
             <a
+              ref={resumeRef}
               href={profile.resume}
-              download={profile.resumeFileName}
-              className="inline-flex h-12 items-center gap-2 rounded-full border border-[color:var(--line)] bg-[rgba(10,16,34,0.5)] px-6 text-[15px] text-[color:var(--ink)] backdrop-blur-md transition-colors hover:border-[rgba(154,123,255,0.45)]"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-12 items-center gap-2 rounded-full border border-[color:var(--line)] bg-[rgba(10,16,34,0.5)] px-6 text-[15px] text-[color:var(--ink)] backdrop-blur-md transition-[transform,border-color] duration-200 will-change-transform hover:border-[rgba(154,123,255,0.45)]"
             >
               <DownloadMark />
               Resume
@@ -92,5 +103,58 @@ export function DownloadMark({ className = "size-[18px]" }: { className?: string
       <path d="m7 10 5 5 5-5" />
       <path d="M5 21h14" />
     </svg>
+  );
+}
+
+/** Holographic portrait: a tinted avatar with subtle CSS rotation + cursor parallax. */
+function HoloPortrait() {
+  const ref = useMagnetic<HTMLDivElement>(0.18, 220);
+  const reduce = useReducedMotion();
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      className="pointer-events-none absolute right-[-2vw] top-1/2 z-0 hidden h-[460px] w-[360px] -translate-y-1/2 will-change-transform md:block"
+      style={{
+        transform: reduce ? undefined : "perspective(1200px) rotateY(-12deg) rotateX(6deg)",
+      }}
+    >
+      <div
+        className="relative h-full w-full overflow-hidden rounded-[28px] border border-[rgba(111,220,239,0.25)] bg-[rgba(8,14,30,0.4)] shadow-[0_30px_120px_-20px_rgba(111,220,239,0.25)]"
+        style={{
+          backgroundImage: `url(${avatarUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center 18%",
+        }}
+      >
+        {/* Cyan scanlines overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "repeating-linear-gradient(180deg, rgba(111,220,239,0.08) 0px, rgba(111,220,239,0.08) 1px, transparent 1px, transparent 3px)",
+            mixBlendMode: "screen",
+          }}
+        />
+        {/* Side gradient mask to feel like a hologram */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(4,6,13,0.4) 0%, transparent 30%, transparent 70%, rgba(4,6,13,0.55) 100%), linear-gradient(90deg, rgba(111,220,239,0.18), transparent 30%)",
+          }}
+        />
+        {/* Bottom mono label */}
+        <div className="mono absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] uppercase tracking-[0.22em] text-[rgba(191,246,255,0.7)]">
+          <span>md.wahid</span>
+          <span className="flex items-center gap-1">
+            <span className="size-1.5 rounded-full bg-[var(--safe)] shadow-[0_0_6px_rgba(95,240,200,0.8)]" />
+            online
+          </span>
+        </div>
+      </div>
+      {/* Holo edge glow */}
+      <div className="absolute -inset-px rounded-[28px] bg-[linear-gradient(135deg,rgba(111,220,239,0.45),transparent_35%,transparent_65%,rgba(154,123,255,0.4))] opacity-50 blur-sm" />
+    </div>
   );
 }

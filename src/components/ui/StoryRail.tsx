@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { Canvas } from "@react-three/fiber";
 import { sectionLayer, storyLayers } from "../../data/profile";
 import { getRange, scrollState, stickyProgress } from "../../lib/scroll";
+import { ProgressOrb } from "../3d/ProgressOrb";
 
 /** The depth gauge: where in the stack the visitor currently is. */
 export function StoryRail() {
@@ -34,6 +36,17 @@ export function StoryRail() {
       aria-label="Career depth"
       className="pointer-events-none fixed right-6 top-1/2 z-30 hidden -translate-y-1/2 xl:block"
     >
+      {/* Scroll progress orb — sits above the rail labels */}
+      <div className="mb-6 ml-auto h-[68px] w-[68px]">
+        <Canvas
+          camera={{ position: [0, 0, 2.6], fov: 45 }}
+          dpr={[1, 1.5]}
+          gl={{ antialias: true, alpha: true }}
+          aria-hidden="true"
+        >
+          <ProgressOrb />
+        </Canvas>
+      </div>
       <ol className="flex flex-col items-end gap-[14px]">
         {storyLayers.map((l, i) => {
           const on = i === active;

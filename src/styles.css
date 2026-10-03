@@ -14,6 +14,34 @@
   --safe: #5ff0c8;
 }
 
+/* Quantum-safelight theme — applied via [data-theme="safelight"] on <html>. */
+[data-theme="safelight"] {
+  --bg: #f5f7fb;
+  --bg-2: #e9eef8;
+  --ink: #0c1430;
+  --muted: #4a5673;
+  --faint: #6b7794;
+  --line: rgba(12, 20, 48, 0.12);
+  --cyan: #0aa9c4;
+  --blue: #2a5cd9;
+  --violet: #6f48d3;
+  --threat: #d04828;
+  --safe: #1f9d75;
+}
+[data-theme="safelight"] .atmosphere {
+  background:
+    radial-gradient(60vw 50vh at 72% 38%, rgba(42, 92, 217, 0.12), transparent 70%),
+    radial-gradient(50vw 60vh at 12% 90%, rgba(111, 72, 211, 0.1), transparent 70%),
+    radial-gradient(120vw 80vh at 50% -10%, rgba(10, 169, 196, 0.08), transparent 60%),
+    linear-gradient(180deg, #f5f7fb 0%, #e9eef8 50%, #f5f7fb 100%);
+}
+[data-theme="safelight"] .vignette {
+  background: radial-gradient(130% 100% at 50% 45%, transparent 55%, rgba(220, 226, 240, 0.55) 100%);
+}
+[data-theme="safelight"] body {
+  color: var(--ink);
+}
+
 /* The page scrolls the window so sticky scenes and the WebGL camera share one clock. */
 html,
 body {
@@ -39,6 +67,23 @@ body {
   background: rgba(111, 220, 239, 0.28);
   color: #fff;
 }
+
+/* Custom cursor — hide native on fine-pointer devices only. */
+@media (pointer: fine) {
+  html,
+  body,
+  a,
+  button,
+  [role="button"],
+  input,
+  textarea,
+  label,
+  select {
+    cursor: none !important;
+  }
+}
+
+/* Ripple animation lives in Cursor.tsx so it can co-locate with the rest of the JS. */
 .mono {
   font-family: "Geist Mono", ui-monospace, monospace;
   font-feature-settings: "zero" 1;

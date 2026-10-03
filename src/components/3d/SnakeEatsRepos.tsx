@@ -147,7 +147,7 @@ export function SnakeEatsRepos({ repos }: { repos: Repo[] }) {
         const r = Math.random();
         if (r < 0.1) {
           const turn = Math.random() < 0.5 ? -1 : 1;
-          s.dir = (((s.dir + turn) % 4) + 4) % 4;
+          s.dir = (((s.dir + turn) % 4) + 4) % 4 as 0 | 1 | 2 | 3;
         }
         const dx = [0, 1, 0, -1][s.dir];
         const dy = [1, 0, -1, 0][s.dir];

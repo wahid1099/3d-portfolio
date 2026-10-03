@@ -3,6 +3,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { particleFragment, particleVertex } from "../../shaders/particles";
 import { scrollState } from "../../lib/scroll";
+import { audioLevelRef } from "../ui/AudioOrb";
 
 const colors = ["#6fdcef", "#4f7dff", "#9a7bff", "#cfe9ff"].map((c) => new THREE.Color(c));
 
@@ -53,6 +54,8 @@ export function ParticleField({ count }: { count: number }) {
     u.uTime.value = state.clock.elapsedTime;
     u.uTravel.value = scrollState.smoothY * 0.011;
     u.uVel.value = THREE.MathUtils.lerp(u.uVel.value, Math.min(Math.abs(scrollState.velocity) / 900, 1.5), 0.08);
+    // Audio-reactive multiplier on size
+    u.uSize.value = 26 + audioLevelRef.current * 28;
   });
 
   return (

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { eduTech, isaraLayers } from "../../data/projects";
 import { profile } from "../../data/profile";
 import { useSection } from "../../hooks/useSection";
@@ -6,9 +6,13 @@ import { Eyebrow, Reveal } from "../ui/Reveal";
 import { curatedRepos, useGitHubRepos, type Repo } from "../../hooks/useGitHubRepos";
 import { GitHubMark } from "./Hero";
 import { SnakeEatsRepos } from "../3d/SnakeEatsRepos";
+import { CaseStudyModal, type CaseStudy } from "../ui/CaseStudyModal";
+import { caseStudyById } from "../../data/caseStudies";
 
 export function Projects() {
   const ref = useSection("projects");
+  const [openId, setOpenId] = useState<string | null>(null);
+  const study = openId ? caseStudyById[openId] ?? null : null;
   return (
     <section id="projects" ref={ref} className="relative py-24 sm:py-32">
       <div className="shell">
@@ -20,11 +24,12 @@ export function Projects() {
         </Reveal>
 
         <div className="mt-14 flex flex-col gap-6">
-          <IsaraCard />
-          <EduSphereCard />
+          <IsaraCard onOpen={() => setOpenId("isara")} />
+          <EduSphereCard onOpen={() => setOpenId("edusphere")} />
           <RepoGrid />
         </div>
       </div>
+      <CaseStudyModal open={!!study} onClose={() => setOpenId(null)} study={study} />
     </section>
   );
 }
@@ -42,7 +47,7 @@ function ProjectMeta({ n, category, title }: { n: string; category: string; titl
   );
 }
 
-function IsaraCard() {
+function IsaraCard({ onOpen }: { onOpen: () => void }) {
   const dur = 4.2;
   return (
     <Reveal>
@@ -91,6 +96,14 @@ function IsaraCard() {
                 </li>
               ))}
             </ol>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="mt-8 inline-flex items-center gap-2 self-start rounded-full border border-[color:var(--line)] bg-[rgba(8,13,28,0.6)] px-5 py-2.5 text-[14px] text-[color:var(--ink)] transition-colors hover:border-[rgba(111,220,239,0.55)] hover:text-white"
+            >
+              Read case study
+              <span>→</span>
+            </button>
           </div>
         </div>
       </article>
@@ -98,7 +111,7 @@ function IsaraCard() {
   );
 }
 
-function EduSphereCard() {
+function EduSphereCard({ onOpen }: { onOpen: () => void }) {
   const tenants = ["School", "Madrasa", "Institute"];
   return (
     <Reveal>
@@ -152,6 +165,14 @@ function EduSphereCard() {
               </li>
             ))}
           </ul>
+          <button
+            type="button"
+            onClick={onOpen}
+            className="mt-2 inline-flex w-fit items-center gap-2 rounded-full border border-[color:var(--line)] bg-[rgba(8,13,28,0.6)] px-5 py-2.5 text-[14px] text-[color:var(--ink)] transition-colors hover:border-[rgba(154,123,255,0.55)] hover:text-white"
+          >
+            Read case study
+            <span>→</span>
+          </button>
         </div>
       </article>
     </Reveal>
