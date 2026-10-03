@@ -1,6 +1,35 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Functions: API proxy.
+[[redirects]]
+  from = "/api/leetcode"
+  to = "/.netlify/functions/leetcode"
+  status = 200
+[[redirects]]
+  from = "/api/github"
+  to = "/.netlify/functions/github"
+  status = 200
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Built-in /.netlify/* must NOT be rewritten by the SPA fallback below.
+[[redirects]]
+  from = "/.netlify/*"
+  to = "/.netlify/:splat"
+  status = 200
+
+# SPA fallback — last; only matches paths the above did not.
+# Exclude /.netlify/* and /api/* from the SPA rewrite so the function always runs.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = { NOT = ["path", "/.netlify/*"], NOT = ["path", "/api/leetcode"], NOT = ["path", "/api/github"], NOT = ["path", "/api/*"] }

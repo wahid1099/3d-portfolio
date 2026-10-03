@@ -13,18 +13,16 @@ export type LeetCodeStats = {
 };
 
 /**
- * Two-part fetch against alfa-leetcode-api.onrender.com:
- *   /<user>/solved       → solved problem counts by tier + AC submissions
- *   /<user>/contest      → contest rating (optional, fallback 1500)
- * We use the AC (accepted) count from /solved which equals the "problems solved"
- * number LeetCode shows on the profile.
+ * Calls the Netlify Function at /api/leetcode which proxies the upstream
+ * LeetCode API and returns { totalSolved, easy/medium/hard, contestRating, ranking, ... }.
+ * The function lives server-side, so:
+ *   - upstream cold-starts never reach the browser
+ *   - 5-min server-side cache means a fresh hit on every revisit
+ *   - a hand-curated snapshot is served if the upstream is fully down
  */
-const BASE = "https://alfa-leetcode-api.onrender.com";
-const USER = "wahidahmed890";
-const SOLVED_URL = `${BASE}/${USER}/solved`;
-const CONTEST_URL = `${BASE}/${USER}/contest`;
-const CACHE_KEY = "lc:stats:v3";
-const CACHE_TTL = 1000 * 60 * 60 * 12; // 12h
+const ENDPOINT = "/api/leetcode";
+const CACHE_KEY = "lc:stats:v4";
+const CACHE_TTL = 1000 * 60 * 60 * 6; // 6h
 
 type Cached<T> = { ts: number; data: T };
 
@@ -80,60 +78,32 @@ export function useLeetCodeStats(): UseStatsState {
       setState({ stats: cached.data, loading: true, error: null, source: "cache" });
     }
 
-    async function fetchSolved(signal: AbortSignal): Promise<Partial<LeetCodeStats>> {
-      const r = await fetch(SOLVED_URL, { signal });
-      // The Heroku app that we used previously kept returning HTML error pages,
-      // so guard against HTML 200s explicitly.
+    async function fetchFromApi(signal: AbortSignal): Promise<LeetCodeStats> {
+      const r = await fetch(ENDPOINT, { signal });
       const ctype = r.headers.get("content-type") ?? "";
       const text = await r.text();
       if (!r.ok || !ctype.includes("application/json")) {
-        throw new Error(`LeetCode /solved: ${r.status} ${ctype || "non-json"}`);
+        throw new Error(`api ${r.status} ${ctype || "non-json"}`);
       }
-      const raw = JSON.parse(text);
-      const ac = Array.isArray(raw.acSubmissionNum) ? raw.acSubmissionNum : [];
-      const find = (d: string) => ac.find((x: { difficulty: string }) => x.difficulty === d);
-      const acAll = find("All");
+      const raw = JSON.parse(text) as Record<string, number | string>;
       return {
-        totalSolved: Number(acAll?.count ?? raw.solvedProblem ?? 0),
-        easySolved: Number(find("Easy")?.count ?? 0),
-        mediumSolved: Number(find("Medium")?.count ?? 0),
-        hardSolved: Number(find("Hard")?.count ?? 0),
+        totalSolved: Number(raw.totalSolved ?? 0),
+        easySolved: Number(raw.easySolved ?? 0),
+        mediumSolved: Number(raw.mediumSolved ?? 0),
+        hardSolved: Number(raw.hardSolved ?? 0),
+        ranking: Number(raw.ranking ?? 0),
+        contributionPoints: Number(raw.contributionPoints ?? 0),
+        reputation: Number(raw.reputation ?? 0),
+        contestRating: Number(raw.contestRating ?? 0),
+        streakDays: Number(raw.streakDays ?? cached?.data.streakDays ?? 300),
       };
-    }
-
-    async function fetchContest(signal: AbortSignal): Promise<Partial<LeetCodeStats>> {
-      try {
-        const r = await fetch(CONTEST_URL, { signal });
-        const ctype = r.headers.get("content-type") ?? "";
-        if (!r.ok || !ctype.includes("application/json")) return {};
-        const raw = (await r.json()) as Record<string, number | string>;
-        return {
-          contestRating: Math.round(Number(raw.rating ?? 0)),
-        };
-      } catch {
-        return {};
-      }
     }
 
     const ctrl = new AbortController();
 
-    Promise.all([fetchSolved(ctrl.signal), fetchContest(ctrl.signal)])
-      .then(([solved, contest]) => {
+    fetchFromApi(ctrl.signal)
+      .then((data) => {
         if (cancelled) return;
-        if (!solved || typeof solved.totalSolved !== "number") {
-          throw new Error("LeetCode /solved: empty response");
-        }
-        const data: LeetCodeStats = {
-          totalSolved: solved.totalSolved ?? 0,
-          easySolved: solved.easySolved ?? 0,
-          mediumSolved: solved.mediumSolved ?? 0,
-          hardSolved: solved.hardSolved ?? 0,
-          ranking: 0,
-          contributionPoints: 0,
-          reputation: 0,
-          contestRating: contest.contestRating ?? 0,
-          streakDays: cached?.data.streakDays ?? 300,
-        };
         writeCache(CACHE_KEY, data);
         setState({ stats: data, loading: false, error: null, source: "live" });
       })

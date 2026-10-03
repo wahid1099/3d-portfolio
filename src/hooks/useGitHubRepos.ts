@@ -14,8 +14,11 @@ export type Repo = {
   archived: boolean;
 };
 
-const ENDPOINT = "https://api.github.com/users/wahid1099/repos?per_page=100&sort=updated";
-const CACHE_KEY = "gh:repos:wahid1099:v1";
+// Hit the Netlify Function at /api/github which proxies api.github.com
+// server-side. Avoids CORS, gets a 30-min server cache, and keeps the repo list
+// fresh without exposing a token.
+const ENDPOINT = "/api/github";
+const CACHE_KEY = "gh:repos:v2";
 const CACHE_TTL = 1000 * 60 * 60 * 6; // 6h
 
 type Cached<T> = { ts: number; data: T };
@@ -122,10 +125,13 @@ export function useGitHubRepos(): UseReposState {
       });
     }
 
-    // 2. Fetch fresh data.
-    fetch(ENDPOINT, { headers: { Accept: "application/vnd.github+json" } })
+    // 2. Fetch fresh data from Netlify Function.
+    fetch(ENDPOINT)
       .then(async (r) => {
-        if (!r.ok) throw new Error(`GitHub API ${r.status}`);
+        const ctype = r.headers.get("content-type") ?? "";
+        if (!r.ok || !ctype.includes("application/json")) {
+          throw new Error(`GitHub proxy ${r.status} ${ctype || "non-json"}`);
+        }
         const data = (await r.json()) as Repo[];
         return data.filter((x) => !x.fork && !x.archived);
       })
