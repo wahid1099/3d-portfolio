@@ -46,12 +46,12 @@ const endpoints: Endpoint[] = [
   {
     id: "go",
     label: "Go",
-    tagline: "fmt.Println, := assignment, for loops, append/len — small Go subset.",
+    tagline: "fmt.Println, := assignment, range loops, append/len — small Go subset.",
     color: "#5ff0c8",
     ring: "rgba(95,240,200,0.35)",
     glyph: "Go",
     defaultPayload: () => ({
-      code: "package main\nsum := 0\nfor i := 1; i <= 10; i++ {\n  sum = sum + i\n}\nfmt.Println(\"sum =\", sum)",
+      code: "package main\nitems := []int{2, 4, 6, 8, 10}\ntotal := 0\nfor _, x := range items {\n  total = total + x\n}\nfmt.Println(\"total =\", total)",
     }),
     formatResult: (r) => String(r?.output ?? r?.error ?? ""),
   },

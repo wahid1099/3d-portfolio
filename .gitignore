@@ -4,4 +4,4 @@ dist
 
 # Source photo is local-only; regenerate derivatives from it.
 public/my-pic.png
-public/avatar.png
+public/avatar.pngtest-payload.json
