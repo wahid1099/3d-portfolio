@@ -8,7 +8,9 @@
     "predev": "node scripts/build-assets.mjs",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "photo:resize": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-photo.ps1",
+    "photo:og": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-og.ps1"
   },
   "dependencies": {
     "@react-three/drei": "^9.114.0",

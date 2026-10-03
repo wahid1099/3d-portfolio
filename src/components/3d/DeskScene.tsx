@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { Float, Text } from "@react-three/drei";
+import { Float, Text, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import type { Tier } from "../../hooks/useDeviceTier";
 
@@ -136,8 +136,11 @@ function Laptop() {
 /* ------------------------------------------------------------------ avatar head */
 
 function AvatarHead() {
-  // Lattice sphere head + shoulders; nodes glow slightly.
+  // Photo portrait mounted on a circular plane inside a rotating lattice sphere.
+  // Three rings of cyan/violet nodes orbit behind it — ties the photo into the
+  // QuantumCore aesthetic without obscuring the face.
   const groupRef = useRef<THREE.Group>(null);
+  const photo = useTexture("/avatar.jpg");
   const headNodes = useMemo(() => {
     const pts: THREE.Vector3[] = [];
     const n = 80; // Fibonacci sphere count
@@ -158,21 +161,36 @@ function AvatarHead() {
 
   return (
     <group ref={groupRef} position={[-1.0, 0.05, 0.4]}>
-      {/* dark sphere core */}
+      {/* dark sphere halo */}
       <mesh>
-        <icosahedronGeometry args={[0.55, 2]} />
-        <meshStandardMaterial color="#0b1530" roughness={0.4} metalness={0.7} emissive="#0a2240" emissiveIntensity={0.3} />
+        <icosahedronGeometry args={[0.62, 2]} />
+        <meshStandardMaterial color="#0b1530" roughness={0.4} metalness={0.7} emissive="#0a2240" emissiveIntensity={0.3} transparent opacity={0.55} />
       </mesh>
       {/* lattice nodes */}
       {headNodes.map((p, i) => (
-        <mesh key={i} position={[p.x * 0.6, p.y * 0.6, p.z * 0.6]}>
-          <sphereGeometry args={[0.02, 8, 8]} />
+        <mesh key={i} position={[p.x * 0.68, p.y * 0.68, p.z * 0.68]}>
+          <sphereGeometry args={[0.022, 8, 8]} />
           <meshBasicMaterial color={i % 7 === 0 ? "#9a7bff" : "#6fdcef"} />
         </mesh>
       ))}
-      {/* neck/shoulders silhouette */}
-      <mesh position={[0, -0.85, -0.1]}>
-        <coneGeometry args={[0.95, 1.6, 16, 1, true]} />
+      {/* glowing ring */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.62, 0.66, 64]} />
+        <meshBasicMaterial color="#6fdcef" transparent opacity={0.45} side={THREE.DoubleSide} />
+      </mesh>
+      {/* photo portrait (front-facing, slightly offset so it reads through the lattice) */}
+      <mesh position={[0, 0, 0.05]}>
+        <circleGeometry args={[0.55, 64]} />
+        <meshBasicMaterial map={photo} transparent toneMapped={false} />
+      </mesh>
+      {/* photo border */}
+      <mesh position={[0, 0, 0.04]}>
+        <ringGeometry args={[0.55, 0.58, 64]} />
+        <meshBasicMaterial color="#04060d" side={THREE.DoubleSide} />
+      </mesh>
+      {/* shoulders silhouette */}
+      <mesh position={[0, -0.95, -0.15]}>
+        <coneGeometry args={[1.1, 1.7, 16, 1, true]} />
         <meshStandardMaterial color="#0f1a36" roughness={0.7} metalness={0.3} side={THREE.DoubleSide} />
       </mesh>
     </group>
