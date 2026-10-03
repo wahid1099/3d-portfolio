@@ -1,7 +1,9 @@
 // netlify/functions/go.mjs
-// POST /api/go — runs a tiny Go-like interpreter covering fmt.Println, := and
-// = assignment, for, while, if, append, len, strings.ToUpper, basic
-// arithmetic. Returns { ok, output, go_version }.
+// POST /api/go — Go-style intent interpreter. Parses common Go syntax
+// (fmt.Println, := and = assignment, fmt.Printf, strings.ToUpper/Lower,
+// len, append, basic arithmetic, for { } infinite loops bounded to 1k,
+// if/else, while via for cond { }).  
+// Returns { ok, output, go_version }.
 
 import { preflight, json, error, readBody } from "./_shared.mjs";
 
@@ -13,20 +15,19 @@ function runGo(src, env) {
   let i = 0;
 
   const skipWs = () => {
-    while (i < src.length && (/\s/.test(src[i]) || src[i] === "\r")) i++;
+    while (i < src.length && /[\s]/.test(src[i])) i++;
   };
-  const peek = (re) => re.test(src[i] ?? "");
 
-  const readIdent = () => {
+  function readIdent() {
     skipWs();
     let j = i;
     while (j < src.length && /[A-Za-z0-9_.]/.test(src[j])) j++;
     const id = src.slice(i, j);
     i = j;
     return id;
-  };
+  }
 
-  const readNumber = () => {
+  function readNumber() {
     skipWs();
     let j = i;
     if (src[j] === "-") j++;
@@ -34,9 +35,9 @@ function runGo(src, env) {
     const n = parseFloat(src.slice(i, j));
     i = j;
     return n;
-  };
+  }
 
-  const readString = () => {
+  function readString() {
     skipWs();
     const q = src[i];
     if (q !== '"' && q !== "'") return undefined;
@@ -52,14 +53,13 @@ function runGo(src, env) {
     }
     i = j + 1;
     return buf;
-  };
+  }
 
-  const readBlock = () => {
+  function readBlock() {
     skipWs();
     if (src[i] !== "{") throw new Error("expected {");
     i++;
-    let depth = 1;
-    let j = i;
+    let depth = 1; let j = i;
     while (j < src.length && depth > 0) {
       if (src[j] === "{") depth++;
       else if (src[j] === "}") { depth--; if (depth === 0) break; }
@@ -68,35 +68,31 @@ function runGo(src, env) {
     const body = src.slice(i, j);
     i = j + 1;
     return body;
-  };
-
-  // Tiny expression parser. Handles:
-  //   numbers | strings | id | ( expr ) | id ( args ) | expr op expr
-  // where op ∈ + - * / and args is comma-separated expressions.
-  function parseExpr() {
-    return parseAddSub();
   }
+
+  // ---- expression parser ----
+  function parseExpr() { return parseAddSub(); }
   function parseAddSub() {
     let left = parseMulDiv();
-    while (true) {
+    skipWs();
+    while (src[i] === "+" || src[i] === "-") {
+      const op = src[i++];
+      const right = parseMulDiv();
+      left = op === "+" ? left + right : left - right;
       skipWs();
-      if (src[i] === "+" || src[i] === "-") {
-        const op = src[i++];
-        const right = parseMulDiv();
-        left = op === "+" ? left + right : left - right;
-      } else return left;
     }
+    return left;
   }
   function parseMulDiv() {
     let left = parseUnary();
-    while (true) {
+    skipWs();
+    while (src[i] === "*" || src[i] === "/") {
+      const op = src[i++];
+      const right = parseUnary();
+      left = op === "*" ? left * right : left / right;
       skipWs();
-      if (src[i] === "*" || src[i] === "/") {
-        const op = src[i++];
-        const right = parseUnary();
-        left = op === "*" ? left * right : left / right;
-      } else return left;
     }
+    return left;
   }
   function parseUnary() {
     skipWs();
@@ -107,43 +103,29 @@ function runGo(src, env) {
   function parsePrimary() {
     skipWs();
     if (src[i] === undefined) throw new Error("unexpected EOF");
-    // number
     if (/[0-9]/.test(src[i])) return readNumber();
-    // string
     if (src[i] === '"' || src[i] === "'") {
       const s = readString();
       if (s === undefined) throw new Error("bad string");
       return s;
     }
-    // parens
-    if (src[i] === "(") {
-      i++;
-      const v = parseExpr();
-      skipWs();
-      if (src[i] !== ")") throw new Error("expected )");
-      i++;
-      return v;
-    }
-    // slice literal []T{...}
+    if (src[i] === "(") { i++; const v = parseExpr(); skipWs(); if (src[i] !== ")") throw new Error("expected )"); i++; return v; }
     if (src[i] === "[" && src[i + 1] === "]") {
-      i += 2;
-      skipWs();
-      if (src[i] === "{") {
-        i++;
-        const items = [];
-        while (true) {
-          skipWs();
-          if (src[i] === "}") { i++; break; }
-          items.push(parseExpr());
-          skipWs();
-          if (src[i] === ",") i++;
-        }
-        return items;
+      i += 2; skipWs();
+      if (src[i] !== "{") throw new Error("expected {");
+      i++;
+      const items = [];
+      while (true) {
+        skipWs();
+        if (src[i] === "}") { i++; break; }
+        items.push(parseExpr());
+        skipWs();
+        if (src[i] === ",") i++;
       }
-      throw new Error("expected {");
+      return items;
     }
     // identifier or call
-    let id = readIdent();
+    const id = readIdent();
     if (!id) throw new Error("expected identifier");
     skipWs();
     if (src[i] === "(") {
@@ -156,23 +138,17 @@ function runGo(src, env) {
         skipWs();
         if (src[i] === ",") i++;
       }
-      // dispatch builtins
       if (id === "fmt.Println") { out.push(args.map((a) => String(a)).join(" ")); return undefined; }
       if (id === "fmt.Printf") {
-        // very small subset: %v, %d, %s, %f
         const fmt = String(args[0] ?? "");
         const rest = args.slice(1);
-        let k = 0;
-        let out2 = "";
-        let idx = 0;
-        while (idx < fmt.length) {
-          const c = fmt[idx++];
-          if (c === "%" && idx < fmt.length) {
-            const spec = fmt[idx++];
-            if (k >= rest.length) break;
+        let k = 0; let out2 = ""; let p = 0;
+        while (p < fmt.length) {
+          const c = fmt[p++];
+          if (c === "%" && p < fmt.length && k < rest.length) {
+            const spec = fmt[p++];
             const v = rest[k++];
-            if (spec === "v" || spec === "s") out2 += String(v);
-            else if (spec === "d") out2 += String(parseInt(v));
+            if (spec === "d") out2 += String(parseInt(v));
             else if (spec === "f") out2 += parseFloat(v).toFixed(2);
             else out2 += String(v);
           } else out2 += c;
@@ -188,86 +164,113 @@ function runGo(src, env) {
       }
       if (id === "strings.ToUpper") return String(args[0]).toUpperCase();
       if (id === "strings.ToLower") return String(args[0]).toLowerCase();
-      if (id === "strconv.Itoa") return String(args[0]);
       throw new Error(`unknown func ${id}`);
     }
-    // bare identifier
     if (id in vars) return vars[id];
     throw new Error(`name '${id}' is not defined`);
+  }
+
+  function evalBoolExpr(s) {
+    const saved = src; const savedI = i;
+    src = s; i = 0;
+    try {
+      skipWs();
+      const l = parseExpr();
+      skipWs();
+      if (src[i] === "<" || src[i] === ">" || src[i] === "=" || src[i] === "!") {
+        let op = src[i]; if (src[i + 1] === "=") { op += src[++i]; }
+        i++;
+        const r = parseExpr();
+        return op === "<" ? l < r : op === ">" ? l > r : op === "==" ? l == r : op === "!=" ? l != r : op === "<=" ? l <= r : l >= r;
+      }
+      return Boolean(l);
+    } finally { src = saved; i = savedI; }
+  }
+
+  function runSubstring(body) {
+    const saved = src; const savedI = i;
+    src = body; i = 0;
+    try {
+      while (i < src.length) {
+        if (!evalStatement()) break;
+      }
+    } finally { src = saved; i = savedI; }
   }
 
   function evalStatement() {
     skipWs();
     if (i >= src.length) return false;
-    // blank line or close brace
     if (src[i] === "}") return false;
-    // package / import (skip line)
-    if (src.startsWith("package ", i)) {
-      // skip until end of line OR semicolon
-      while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
-      if (src[i] === ";") i++;
+    if (src[i] === "\n") { i++; return true; }
+    // package / import: skip to end of line
+    if (src.startsWith("package ", i)) { while (i < src.length && src[i] !== "\n") i++; return true; }
+    if (src.startsWith("import ", i) || src.startsWith("import(", i)) {
+      while (i < src.length && src[i] !== "\n") i++;
       return true;
     }
-    if (src.startsWith("import ", i)) {
-      // skip until end of line OR semicolon
-      while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
-      if (src[i] === ";") i++;
-      return true;
-    }
-    // for
-    if (src.startsWith("for ", i) || (src[i] === "f" && src.startsWith("for", i) && /\W/.test(src[i + 3] ?? ""))) {
-      const k = i;
-      while (src[k] !== " " && src[k] !== "\n" && src[k] !== "{") k++;
-      if (src[k] === " ") {
-        // Standard "for init; cond; post { body }" form.
-        const header = src.slice(i + 4, src.indexOf("{", i));
+    // for { body }
+    if (src.startsWith("for ", i) || (src[i] === "f" && src.startsWith("for", i) && !/[A-Za-z0-9_]/.test(src[i + 3] ?? ""))) {
+      // Two forms: "for {" infinite  /  "for init; cond; post { body }"
+      const spaceIdx = src.indexOf(" ", i);
+      if (spaceIdx === -1 || src[spaceIdx + 1] === "{") {
+        // infinite loop
         const body = readBlock();
-        const parts = header.split(";");
-        const init = (parts[0] ?? "").trim();
-        const cond = (parts[1] ?? "").trim();
-        const post = (parts[2] ?? "").trim();
-        if (init) evalStatementOn(init + ";");
-        const safety = 10000;
-        let n = 0;
-        while (n++ < safety) {
-          const c = cond ? evalBoolExpr(cond) : true;
-          if (!c) break;
-          runGo(body, vars).forEach((l) => out.push(l));
-          if (post) evalStatementOn(post + ";");
-        }
+        for (let k = 0; k < 1000; k++) runSubstring(body);
         return true;
       }
-      // No condition — infinite loop bounded to 1000 iters
-      const body = readBlock();
-      for (let k = 0; k < 1000; k++) runGo(body, vars).forEach((l) => out.push(l));
+      // find "{" at end of header
+      const braceIdx = src.indexOf("{", i);
+      const header = src.slice(i + 4, braceIdx);
+      const body = src.slice(braceIdx + 1, src.indexOf("}", braceIdx));
+      i = braceIdx + 1 + body.length + 1;
+      const parts = header.split(";");
+      const init = (parts[0] ?? "").trim();
+      const cond = (parts[1] ?? "").trim();
+      const post = (parts[2] ?? "").trim();
+      if (init) {
+        const saved = src, savedI = i;
+        src = init + ";"; i = 0;
+        try { evalStatement(); } finally { src = saved; i = savedI; }
+      }
+      const safety = 10000;
+      let n2 = 0;
+      while (n2++ < safety) {
+        const c = cond ? evalBoolExpr(cond) : true;
+        if (!c) break;
+        runSubstring(body);
+        if (post) {
+          const saved = src, savedI = i;
+          src = post + ";"; i = 0;
+          try { evalStatement(); } finally { src = saved; i = savedI; }
+        }
+      }
       return true;
     }
-    // if
+    // if cond { body } [ else { body } ]
     if (src.startsWith("if ", i)) {
       i += 3;
+      const braceIdx = src.indexOf("{", i);
+      const cond = src.slice(i, braceIdx).trim();
+      const body = src.slice(braceIdx + 1, src.indexOf("}", braceIdx));
+      i = braceIdx + 1 + body.length + 1;
+      const c = evalBoolExpr(cond);
+      if (c) runSubstring(body);
       skipWs();
-      const cond = parseExpr();
-      skipWs();
-      const body = readBlock();
-      let elseBody = null;
-      skipWs();
-      if (src.startsWith("else", i)) {
-        i += 4;
-        skipWs();
-        if (src[i] === "{") elseBody = readBlock();
-        else { /* ignore nested if for simplicity */ }
+      if (src.startsWith("else ", i)) {
+        i += 5; skipWs();
+        if (src[i] === "{") {
+          const b2 = readBlock();
+          if (!c) runSubstring(b2);
+        }
       }
-      if (cond) runGo(body, vars).forEach((l) => out.push(l));
-      else if (elseBody) runGo(elseBody, vars).forEach((l) => out.push(l));
       return true;
     }
-    // var x = …  |  x := …  |  x = …
-    const save = i;
-    let id = "";
+    // var x = expr  |  x := expr  |  x = expr
+    let save = i;
     let j = i;
     while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
-    if (j > i && (src[j] === " " || src[j] === "\n" || src[j] === "=" || src[j] === ":")) {
-      id = src.slice(i, j);
+    if (j > i && j < src.length) {
+      const id = src.slice(i, j);
       i = j;
       skipWs();
       if (src.startsWith(":=", i)) {
@@ -286,46 +289,13 @@ function runGo(src, env) {
         if (src[i] === ";") i++;
         return true;
       }
-      if (id === "var") {
-        // var name = expr
-        i = j;
-        skipWs();
-        id = readIdent();
-        skipWs();
-        if (src[i] === "=") { i++; vars[id] = parseExpr(); }
-        while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
-        if (src[i] === ";") i++;
-        return true;
-      }
+      i = save; // rewind
     }
-    i = save; // rewind if not an assignment
-    // bare expression statement
+    // bare expression statement (e.g. fmt.Println(...);)
     parseExpr();
     while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
     if (src[i] === ";") i++;
     return true;
-  }
-
-  function evalStatementOn(src2) {
-    const saved = src; const savedI = i;
-    src = src2; i = 0;
-    try { evalStatement(); } finally { src = saved; i = savedI; }
-  }
-
-  function evalBoolExpr(s) {
-    const saved = src; const savedI = i;
-    src = s + ";"; i = 0;
-    try {
-      const v = parseExpr();
-      skipWs();
-      if (src[i] === "<" || src[i] === ">" || src[i] === "=" || src[i] === "!") {
-        const op = src[i] + (src[i + 1] === "=" ? src[++i] : "");
-        i++;
-        const r = parseExpr();
-        return op === "<" ? v < r : op === ">" ? v > r : op === "==" ? v == r : op === "!=" ? v != r : op === "<=" ? v <= r : v >= r;
-      }
-      return Boolean(v);
-    } finally { src = saved; i = savedI; }
   }
 
   try {
@@ -345,4 +315,3 @@ export default async (request) => {
   const lines = runGo(code, input);
   return json({ ok: true, output: lines.join("\n"), go_version: GO_VERSION });
 };
-// 2026-10-03T12:03:51.7317878+06:00
