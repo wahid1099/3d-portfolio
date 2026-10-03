@@ -19,7 +19,11 @@ function runPhp(src, env) {
     let j = i + 1;
     let buf = "";
     while (j < src.length && src[j] !== q) {
-      if (src[j] === "\\" && j + 1 < src.length) { buf += src[j + 1]; j += 2; continue; }
+      if (src[j] === "\\" && j + 1 < src.length) {
+        const c = src[j + 1];
+        buf += c === "n" ? "\n" : c === "t" ? "\t" : c === "\\" ? "\\" : c;
+        j += 2; continue;
+      }
       buf += src[j++];
     }
     i = j + 1;
