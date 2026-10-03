@@ -1,7 +1,7 @@
 // netlify/functions/go.mjs
-// POST /api/go { code: 'fmt.Println("hi")' } — runs a tiny Go-like interpreter
-// covering fmt.Println, := and var = assignment, for loops, if/else, append,
-// len, strings.ToUpper, basic arithmetic.
+// POST /api/go — runs a tiny Go-like interpreter covering fmt.Println, := and
+// = assignment, for, while, if, append, len, strings.ToUpper, basic
+// arithmetic. Returns { ok, output, go_version }.
 
 import { preflight, json, error, readBody } from "./_shared.mjs";
 
@@ -11,16 +11,16 @@ function runGo(src, env) {
   const out = [];
   const vars = { ...env };
   let i = 0;
-  const skipWs = () => { while (i < src.length && /\s/.test(src[i])) i++; };
-  const match = (s) => src.startsWith(s, i);
-  const strip = () => src.slice(i);
 
-  const stripWS = () => src.slice(i).replace(/^\s+/, "");
+  const skipWs = () => {
+    while (i < src.length && (/\s/.test(src[i]) || src[i] === "\r")) i++;
+  };
+  const peek = (re) => re.test(src[i] ?? "");
 
   const readIdent = () => {
     skipWs();
     let j = i;
-    while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
+    while (j < src.length && /[A-Za-z0-9_.]/.test(src[j])) j++;
     const id = src.slice(i, j);
     i = j;
     return id;
@@ -39,6 +39,7 @@ function runGo(src, env) {
   const readString = () => {
     skipWs();
     const q = src[i];
+    if (q !== '"' && q !== "'") return undefined;
     let j = i + 1;
     let buf = "";
     while (j < src.length && src[j] !== q) {
@@ -53,156 +54,12 @@ function runGo(src, env) {
     return buf;
   };
 
-  const parseUntil = (chars) => {
-    skipWs();
-    let buf = "";
-    while (i < src.length && !chars.includes(src[i])) {
-      if (src[i] === '"' || src[i] === "'") { buf += readString(); continue; }
-      buf += src[i++];
-    }
-    return buf;
-  };
-
-  const evalExpr = () => {
-    skipWs();
-    // Handle: package main / import / func — top-level decls are ignored at runtime
-    if (match("package") || match("import") || match("func")) return null;
-    if (src[i] === '"' || src[i] === "'") return readString();
-    if (/[0-9-]/.test(src[i])) return readNumber();
-    if (src[i] === "(") {
-      i++;
-      const v = evalExpr();
-      skipWs();
-      if (src[i] === ")") i++;
-      return v;
-    }
-    // identifier — possibly a call
-    let id = "";
-    let j = i;
-    while (j < src.length && /[A-Za-z0-9_.]/.test(src[j])) j++;
-    id = src.slice(i, j);
-    i = j;
-    skipWs();
-    if (src[i] === "(") {
-      i++;
-      const args = [];
-      while (skipWs(), src[i] !== ")") {
-        args.push(evalExpr());
-        if (src[i] === ",") { i++; }
-      }
-      if (src[i] === ")") i++;
-      if (id === "len") return (Array.isArray(args[0]) || typeof args[0] === "string" ? args[0].length : Object.keys(args[0] ?? {}).length);
-      if (id === "append") {
-        const arr = [...(args[0] ?? [])];
-        for (let k = 1; k < args.length; k++) arr.push(args[k]);
-        return arr;
-      }
-      if (id === "strings.ToUpper") return String(args[0]).toUpperCase();
-      if (id === "strings.ToLower") return String(args[0]).toLowerCase();
-      if (id === "fmt.Println") { out.push(args.map(String).join(" ")); return undefined; }
-      if (id === "fmt.Printf") {
-        const fmt = String(args[0] ?? "");
-        const rest = args.slice(1);
-        let k = 0; let out2 = "";
-        for (const ch of fmt) {
-          if (ch === "%" && k < rest.length) { const v = rest[k++]; const spec = fmt[fmt.indexOf("%") + 1]; out2 += spec === "d" ? String(parseInt(v)) : spec === "f" ? parseFloat(v).toFixed(2) : String(v); fmt; }
-          else out2 += ch;
-        }
-        out.push(out2);
-        return undefined;
-      }
-      throw new Error(`unknown func ${id}`);
-    }
-    if (id in vars) return vars[id];
-    throw new Error(`unknown '${id}'`);
-  };
-
-  const evalStatement = () => {
-    skipWs();
-    if (match("package") || match("import") || match("func")) {
-      // skip the rest of the line / block
-      while (i < src.length && src[i] !== "\n") i++;
-      return;
-    }
-    if (match("for")) {
-      i += 3; skipWs();
-      if (src[i] === "{") {
-        // infinite-ish — bounded by 1k iterations
-        const body = readBlock();
-        const limit = 1000;
-        for (let k = 0; k < limit; k++) {
-          runGo(body, vars).forEach((l) => out.push(l));
-        }
-        return;
-      }
-      // for init; cond; post
-      const init = parseUntil(";");
-      skipWs(); if (src[i] === ";") i++;
-      const condExpr = parseUntil(";");
-      skipWs(); if (src[i] === ";") i++;
-      const postExpr = parseUntil("{").trim();
-      const body = readBlock();
-      // eval init as a statement-ish: replace := with = for parsing
-      try { runGo(init + "\n", vars); } catch {}
-      while (true) {
-        const v = (() => { try { return evalGoSimple(condExpr, vars); } catch { return true; } })();
-        if (!v) break;
-        runGo(body, vars).forEach((l) => out.push(l));
-        try { evalGoSimple(postExpr, vars); } catch {}
-      }
-      return;
-    }
-    if (match("if")) {
-      i += 2; skipWs();
-      const cond = parseUntil("{").trim();
-      const body = readBlock();
-      skipWs();
-      let elseBody = null;
-      if (match("else")) {
-        i += 4;
-        elseBody = readBlock();
-      }
-      const v = (() => { try { return evalGoSimple(cond, vars); } catch { return true; } })();
-      if (v) runGo(body, vars).forEach((l) => out.push(l));
-      else if (elseBody) runGo(elseBody, vars).forEach((l) => out.push(l));
-      return;
-    }
-    // assignment: x := 5  |  x = 5
-    if (/[A-Za-z_]/.test(src[i])) {
-      const id = readIdent();
-      skipWs();
-      if (match(":=")) {
-        i += 2;
-        const rhs = parseUntil("\n;");
-        vars[id] = evalGoSimple(rhs, vars);
-        if (src[i] === ";") i++;
-        return;
-      }
-      if (src[i] === "=") {
-        i++;
-        const rhs = parseUntil("\n;");
-        vars[id] = evalGoSimple(rhs, vars);
-        if (src[i] === ";") i++;
-        return;
-      }
-      // bare expression statement
-      const rest = stripWS();
-      evalGoSimple(id + rest.split(/[;\n]/)[0], vars);
-      const nl = src.indexOf("\n", i);
-      i = nl < 0 ? src.length : nl + 1;
-      return;
-    }
-    // bare expression
-    evalExpr();
-    if (src[i] === ";") i++;
-    if (src[i] === "\n") i++;
-  };
-
   const readBlock = () => {
     skipWs();
     if (src[i] !== "{") throw new Error("expected {");
     i++;
-    let depth = 1; let j = i;
+    let depth = 1;
+    let j = i;
     while (j < src.length && depth > 0) {
       if (src[j] === "{") depth++;
       else if (src[j] === "}") { depth--; if (depth === 0) break; }
@@ -213,26 +70,264 @@ function runGo(src, env) {
     return body;
   };
 
-  // tiny expression evaluator for "for" conditions / inline RHS — supports + - * /
-  const evalGoSimple = (s, v) => {
-    s = s.trim();
-    // string?
-    if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) return s.slice(1, -1);
-    // number?
-    if (/^-?[0-9.]+$/.test(s)) return parseFloat(s);
-    // known identifier?
-    if (s in v) return v[s];
-    // basic arithmetic on two operands
-    const m = s.match(/^(.+?)([+\-*/])(.+)$/);
-    if (m) {
-      const l = evalGoSimple(m[1], v);
-      const r = evalGoSimple(m[3], v);
-      return m[5] === "+" ? l + r : m[5] === "-" ? l - r : m[5] === "*" ? l * r : l / r;
+  // Tiny expression parser. Handles:
+  //   numbers | strings | id | ( expr ) | id ( args ) | expr op expr
+  // where op ∈ + - * / and args is comma-separated expressions.
+  function parseExpr() {
+    return parseAddSub();
+  }
+  function parseAddSub() {
+    let left = parseMulDiv();
+    while (true) {
+      skipWs();
+      if (src[i] === "+" || src[i] === "-") {
+        const op = src[i++];
+        const right = parseMulDiv();
+        left = op === "+" ? left + right : left - right;
+      } else return left;
     }
-    return Boolean(s);
-  };
+  }
+  function parseMulDiv() {
+    let left = parseUnary();
+    while (true) {
+      skipWs();
+      if (src[i] === "*" || src[i] === "/") {
+        const op = src[i++];
+        const right = parseUnary();
+        left = op === "*" ? left * right : left / right;
+      } else return left;
+    }
+  }
+  function parseUnary() {
+    skipWs();
+    if (src[i] === "-") { i++; return -parsePrimary(); }
+    if (src[i] === "+") { i++; return parsePrimary(); }
+    return parsePrimary();
+  }
+  function parsePrimary() {
+    skipWs();
+    if (src[i] === undefined) throw new Error("unexpected EOF");
+    // number
+    if (/[0-9]/.test(src[i])) return readNumber();
+    // string
+    if (src[i] === '"' || src[i] === "'") {
+      const s = readString();
+      if (s === undefined) throw new Error("bad string");
+      return s;
+    }
+    // parens
+    if (src[i] === "(") {
+      i++;
+      const v = parseExpr();
+      skipWs();
+      if (src[i] !== ")") throw new Error("expected )");
+      i++;
+      return v;
+    }
+    // slice literal []T{...}
+    if (src[i] === "[" && src[i + 1] === "]") {
+      i += 2;
+      skipWs();
+      if (src[i] === "{") {
+        i++;
+        const items = [];
+        while (true) {
+          skipWs();
+          if (src[i] === "}") { i++; break; }
+          items.push(parseExpr());
+          skipWs();
+          if (src[i] === ",") i++;
+        }
+        return items;
+      }
+      throw new Error("expected {");
+    }
+    // identifier or call
+    let id = readIdent();
+    if (!id) throw new Error("expected identifier");
+    skipWs();
+    if (src[i] === "(") {
+      i++;
+      const args = [];
+      while (true) {
+        skipWs();
+        if (src[i] === ")") { i++; break; }
+        args.push(parseExpr());
+        skipWs();
+        if (src[i] === ",") i++;
+      }
+      // dispatch builtins
+      if (id === "fmt.Println") { out.push(args.map((a) => String(a)).join(" ")); return undefined; }
+      if (id === "fmt.Printf") {
+        // very small subset: %v, %d, %s, %f
+        const fmt = String(args[0] ?? "");
+        const rest = args.slice(1);
+        let k = 0;
+        let out2 = "";
+        let idx = 0;
+        while (idx < fmt.length) {
+          const c = fmt[idx++];
+          if (c === "%" && idx < fmt.length) {
+            const spec = fmt[idx++];
+            if (k >= rest.length) break;
+            const v = rest[k++];
+            if (spec === "v" || spec === "s") out2 += String(v);
+            else if (spec === "d") out2 += String(parseInt(v));
+            else if (spec === "f") out2 += parseFloat(v).toFixed(2);
+            else out2 += String(v);
+          } else out2 += c;
+        }
+        out.push(out2);
+        return undefined;
+      }
+      if (id === "len") return (Array.isArray(args[0]) || typeof args[0] === "string") ? args[0].length : Object.keys(args[0] ?? {}).length;
+      if (id === "append") {
+        const arr = Array.isArray(args[0]) ? [...args[0]] : [];
+        for (let k = 1; k < args.length; k++) arr.push(args[k]);
+        return arr;
+      }
+      if (id === "strings.ToUpper") return String(args[0]).toUpperCase();
+      if (id === "strings.ToLower") return String(args[0]).toLowerCase();
+      if (id === "strconv.Itoa") return String(args[0]);
+      throw new Error(`unknown func ${id}`);
+    }
+    // bare identifier
+    if (id in vars) return vars[id];
+    throw new Error(`name '${id}' is not defined`);
+  }
 
-  while (i < src.length) evalStatement();
+  function evalStatement() {
+    skipWs();
+    if (i >= src.length) return false;
+    // blank line or close brace
+    if (src[i] === "}") return false;
+    // package / import (skip line)
+    if (src.startsWith("package ", i)) { while (i < src.length && src[i] !== "\n") i++; return true; }
+    if (src.startsWith("import ", i)) {
+      while (i < src.length && src[i] !== "\n") i++;
+      return true;
+    }
+    // for
+    if (src.startsWith("for ", i) || (src[i] === "f" && src.startsWith("for", i) && /\W/.test(src[i + 3] ?? ""))) {
+      const k = i;
+      while (src[k] !== " " && src[k] !== "\n" && src[k] !== "{") k++;
+      if (src[k] === " ") {
+        // Standard "for init; cond; post { body }" form.
+        const header = src.slice(i + 4, src.indexOf("{", i));
+        const body = readBlock();
+        const parts = header.split(";");
+        const init = (parts[0] ?? "").trim();
+        const cond = (parts[1] ?? "").trim();
+        const post = (parts[2] ?? "").trim();
+        if (init) evalStatementOn(init + ";");
+        const safety = 10000;
+        let n = 0;
+        while (n++ < safety) {
+          const c = cond ? evalBoolExpr(cond) : true;
+          if (!c) break;
+          runGo(body, vars).forEach((l) => out.push(l));
+          if (post) evalStatementOn(post + ";");
+        }
+        return true;
+      }
+      // No condition — infinite loop bounded to 1000 iters
+      const body = readBlock();
+      for (let k = 0; k < 1000; k++) runGo(body, vars).forEach((l) => out.push(l));
+      return true;
+    }
+    // if
+    if (src.startsWith("if ", i)) {
+      i += 3;
+      skipWs();
+      const cond = parseExpr();
+      skipWs();
+      const body = readBlock();
+      let elseBody = null;
+      skipWs();
+      if (src.startsWith("else", i)) {
+        i += 4;
+        skipWs();
+        if (src[i] === "{") elseBody = readBlock();
+        else { /* ignore nested if for simplicity */ }
+      }
+      if (cond) runGo(body, vars).forEach((l) => out.push(l));
+      else if (elseBody) runGo(elseBody, vars).forEach((l) => out.push(l));
+      return true;
+    }
+    // var x = …  |  x := …  |  x = …
+    const save = i;
+    let id = "";
+    let j = i;
+    while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j++;
+    if (j > i && (src[j] === " " || src[j] === "\n" || src[j] === "=" || src[j] === ":")) {
+      id = src.slice(i, j);
+      i = j;
+      skipWs();
+      if (src.startsWith(":=", i)) {
+        i += 2;
+        const v = parseExpr();
+        vars[id] = v;
+        while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+        if (src[i] === ";") i++;
+        return true;
+      }
+      if (src[i] === "=") {
+        i++;
+        const v = parseExpr();
+        vars[id] = v;
+        while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+        if (src[i] === ";") i++;
+        return true;
+      }
+      if (id === "var") {
+        // var name = expr
+        i = j;
+        skipWs();
+        id = readIdent();
+        skipWs();
+        if (src[i] === "=") { i++; vars[id] = parseExpr(); }
+        while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+        if (src[i] === ";") i++;
+        return true;
+      }
+    }
+    i = save; // rewind if not an assignment
+    // bare expression statement
+    parseExpr();
+    while (i < src.length && src[i] !== "\n" && src[i] !== ";") i++;
+    if (src[i] === ";") i++;
+    return true;
+  }
+
+  function evalStatementOn(src2) {
+    const saved = src; const savedI = i;
+    src = src2; i = 0;
+    try { evalStatement(); } finally { src = saved; i = savedI; }
+  }
+
+  function evalBoolExpr(s) {
+    const saved = src; const savedI = i;
+    src = s + ";"; i = 0;
+    try {
+      const v = parseExpr();
+      skipWs();
+      if (src[i] === "<" || src[i] === ">" || src[i] === "=" || src[i] === "!") {
+        const op = src[i] + (src[i + 1] === "=" ? src[++i] : "");
+        i++;
+        const r = parseExpr();
+        return op === "<" ? v < r : op === ">" ? v > r : op === "==" ? v == r : op === "!=" ? v != r : op === "<=" ? v <= r : v >= r;
+      }
+      return Boolean(v);
+    } finally { src = saved; i = savedI; }
+  }
+
+  try {
+    while (i < src.length) {
+      if (!evalStatement()) break;
+    }
+  } catch (e) {
+    out.push("[error] " + (e.message || e));
+  }
   return out;
 }
 

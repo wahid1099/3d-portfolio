@@ -61,6 +61,19 @@ function runPhp(src, env) {
       const n = readVar();
       return n in vars ? vars[n] : undefined;
     }
+    // array literal
+    if (src[i] === "[") {
+      i++;
+      const items = [];
+      while (true) {
+        skipWs();
+        if (src[i] === "]") { i++; break; }
+        items.push(evalExpr("].,"));
+        skipWs();
+        if (src[i] === ",") i++;
+      }
+      return items;
+    }
     // parens
     if (src[i] === "(") {
       i++;
