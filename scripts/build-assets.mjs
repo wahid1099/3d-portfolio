@@ -1,5 +1,7 @@
 // scripts/build-assets.mjs
 // Convert source SVG assets into the PNGs that OG/Apple crawlers need.
+// Also generates photo-based favicons (favicon-32.png, apple-touch-icon.png,
+// favicon.svg) from public/avatar.jpg via gen-favicon.mjs.
 // Uses @resvg/resvg-js — pure JS, no native build step.
 //
 // Skip rules:
@@ -54,3 +56,8 @@ for (const { src, out, w, h, skipIf } of jobs) {
 if (hasPhoto) {
   console.log("photo derivatives present — using photo-based OG and icons");
 }
+
+// Always regenerate the photo-based favicons.
+import("./gen-favicon.mjs").catch((e) =>
+  console.warn("favicon generation skipped:", e.message),
+);

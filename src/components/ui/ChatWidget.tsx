@@ -54,61 +54,88 @@ function reducer(s: State, a: Action): State {
   }
 }
 
-// ─── sound ───────────────────────────────────────────────────────────────────
+// --- sound ------------------------------------------------------------------
+//
+// Browsers on HTTPS (Netlify, Vercel, etc.) enforce the Web Audio autoplay
+// policy: AudioContext starts in "suspended" state and can only transition to
+// "running" after a user gesture (click, keydown, touch).
+//
+// FIX: share ONE AudioContext for the whole widget lifetime and register a
+// one-shot gesture listener that calls ctx.resume() on first interaction.
+// Every ping then calls resume() before scheduling oscillators — a no-op
+// when the context is already running.
+
+type WAC = typeof window.AudioContext;
+const AudioContextCtor: WAC | undefined =
+  typeof window !== "undefined"
+    ? (window.AudioContext ||
+        (window as unknown as { webkitAudioContext: WAC }).webkitAudioContext)
+    : undefined;
+
+let _sharedCtx: AudioContext | null = null;
+
+function getAudioCtx(): AudioContext | null {
+  if (!AudioContextCtor) return null;
+  if (!_sharedCtx || _sharedCtx.state === "closed") {
+    try { _sharedCtx = new AudioContextCtor(); } catch { return null; }
+  }
+  return _sharedCtx;
+}
+
+// Register document-level gesture listeners so the context is unlocked the
+// moment the visitor first interacts — even before the widget opens.
+function ensureUnlocked() {
+  const ctx = getAudioCtx();
+  if (!ctx || ctx.state === "running") return;
+  const unlock = () => {
+    ctx.resume().catch(() => { /* silent */ });
+  };
+  document.addEventListener("pointerdown", unlock, { capture: true, once: true });
+  document.addEventListener("keydown",     unlock, { capture: true, once: true });
+  document.addEventListener("touchstart",  unlock, { capture: true, once: true, passive: true });
+}
 
 /**
- * Synthesises a soft chat-notification ping using the Web Audio API.
- * Two sine oscillators (fundamental + octave) give a warm, pleasant tone.
- * Safe to call before any user gesture — browsers allow AudioContext creation
- * but will only actually play after a user interaction has occurred.
- *
- * @param pitch  Fundamental frequency in Hz (default 880 — a crisp A5)
- * @param vol    Peak gain, 0–1 (default 0.18 — subtle, not jarring)
+ * Play a two-oscillator sine ping on the shared AudioContext.
+ * Calls resume() first so it works after any prior user gesture,
+ * even if the context was created while still suspended.
  */
 function playChatPing(pitch = 880, vol = 0.18) {
-  try {
-    const ctx = new (window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext)();
-
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  ctx.resume().then(() => {
+    if (ctx.state !== "running") return;
+    const now = ctx.currentTime;
     const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0, ctx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(vol, ctx.currentTime + 0.008);
-    masterGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.55);
+    masterGain.gain.setValueAtTime(0, now);
+    masterGain.gain.linearRampToValueAtTime(vol, now + 0.008);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
     masterGain.connect(ctx.destination);
-
-    // Fundamental
     const osc1 = ctx.createOscillator();
     osc1.type = "sine";
     osc1.frequency.value = pitch;
     osc1.connect(masterGain);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.56);
-
-    // Octave above — adds warmth without harshness
+    osc1.start(now);
+    osc1.stop(now + 0.56);
     const osc2 = ctx.createOscillator();
     osc2.type = "sine";
     osc2.frequency.value = pitch * 2;
     const gain2 = ctx.createGain();
-    gain2.gain.value = 0.35; // quieter blend
+    gain2.gain.value = 0.35;
     osc2.connect(gain2);
     gain2.connect(masterGain);
-    osc2.start(ctx.currentTime);
-    osc2.stop(ctx.currentTime + 0.56);
-
-    // Cleanup after playback
-    osc1.addEventListener("ended", () => ctx.close());
-  } catch {
-    // AudioContext not available (e.g. SSR / older browser) — fail silently
-  }
+    osc2.start(now);
+    osc2.stop(now + 0.56);
+  }).catch(() => { /* autoplay still blocked — silent */ });
 }
 
 /**
- * Hook that fires a chat ping whenever `trigger` changes, but skips the
- * very first render so opening the page never makes a sound.
+ * Hook: fires a ping when `trigger` changes (skips first render).
+ * Registers the gesture-unlock listener on mount.
  */
 function useChatPing(trigger: unknown, pitch?: number, vol?: number) {
   const isFirst = useRef(true);
+  useEffect(() => { ensureUnlocked(); }, []);
   useEffect(() => {
     if (isFirst.current) { isFirst.current = false; return; }
     playChatPing(pitch, vol);
@@ -173,7 +200,7 @@ export function ChatWidget() {
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 280, damping: 22 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.8 }}
             onClick={() => setOpen((v) => !v)}
             className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full border border-[rgba(111,220,239,0.35)] bg-[rgba(8,13,28,0.9)] p-0.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.6)] backdrop-blur-md transition-transform hover:scale-105"
           >
@@ -197,10 +224,10 @@ export function ChatWidget() {
             role="dialog"
             aria-modal="false"
             aria-label="Chat with Wahid"
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 340, damping: 30, mass: 0.9 }}
             className="fixed bottom-24 right-6 z-50 w-[320px] overflow-hidden rounded-2xl border border-[rgba(111,220,239,0.18)] bg-[rgba(8,13,28,0.92)] shadow-[0_24px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl"
           >
             {/* header */}
@@ -240,9 +267,9 @@ export function ChatWidget() {
                 {MESSAGES.slice(0, visible).map((msg) => (
                   <motion.div
                     key={msg.id}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ type: "spring", stiffness: 380, damping: 28, mass: 0.7 }}
                     className="max-w-[85%] rounded-2xl rounded-tl-sm bg-[rgba(255,255,255,0.06)] px-3.5 py-2.5 text-[13.5px] leading-[1.45] text-[color:var(--ink)]"
                   >
                     {msg.text}
@@ -253,9 +280,10 @@ export function ChatWidget() {
                 {visible < MESSAGES.length && (
                   <motion.div
                     key="typing"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
+                    initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ type: "spring", stiffness: 320, damping: 26 }}
                     className="flex w-14 items-center justify-center gap-1 rounded-2xl rounded-tl-sm bg-[rgba(255,255,255,0.06)] py-3"
                   >
                     {[0, 1, 2].map((i) => (
@@ -276,9 +304,9 @@ export function ChatWidget() {
                     {/* user bubble */}
                     <motion.div
                       key="user-reply"
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28 }}
+                      initial={{ opacity: 0, y: 10, x: 8 }}
+                      animate={{ opacity: 1, y: 0, x: 0 }}
+                      transition={{ type: "spring", stiffness: 360, damping: 28 }}
                       className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-[rgba(111,220,239,0.15)] px-3.5 py-2.5 text-[13.5px] text-[color:var(--cyan)]"
                     >
                       {QUICK_REPLIES[chosen].label}
@@ -286,9 +314,9 @@ export function ChatWidget() {
                     {/* bot reply */}
                     <motion.div
                       key="bot-response"
-                      initial={{ opacity: 0, y: 8 }}
+                      initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.28, delay: 0.45 }}
+                      transition={{ type: "spring", stiffness: 360, damping: 28, delay: 0.38 }}
                       className="max-w-[85%] rounded-2xl rounded-tl-sm bg-[rgba(255,255,255,0.06)] px-3.5 py-2.5 text-[13.5px] leading-[1.45] text-[color:var(--ink)]"
                     >
                       {QUICK_REPLIES[chosen].response}
@@ -303,9 +331,9 @@ export function ChatWidget() {
               {visible >= MESSAGES.length && chosen === null && (
                 <motion.div
                   key="quick-replies"
-                  initial={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
+                  transition={{ type: "spring", stiffness: 340, damping: 28, delay: 0.05 }}
                   className="border-t border-[color:var(--line)] px-4 pb-4 pt-3"
                 >
                   <p className="mono mb-2.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-[color:var(--faint)]">
@@ -336,9 +364,9 @@ export function ChatWidget() {
               {chosen !== null && (
                 <motion.div
                   key="cta"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 1.1 }}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 28, delay: 0.9 }}
                   className="border-t border-[color:var(--line)] px-4 py-3 text-center"
                 >
                   <a
