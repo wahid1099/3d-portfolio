@@ -14,6 +14,7 @@ import { HandshakeDemo } from "./components/sections/HandshakeDemo";
 import { Cursor } from "./components/ui/Cursor";
 import { ScrollProgress } from "./components/ui/ScrollProgress";
 import { DailyQuote } from "./components/ui/DailyQuote";
+import { ChatWidget } from "./components/ui/ChatWidget";
 
 // Section code-splitting: every section except MissionControl and FAQ is
 // lazy + Suspense. This keeps the initial JS small while letting heavy
@@ -143,6 +144,7 @@ export default function Portfolio() {
       <ResumeCardLauncher />
       <SystemLog />
       <SecretRoomGate />
+      <ChatWidget />
       <Cursor />
     </>
   );
